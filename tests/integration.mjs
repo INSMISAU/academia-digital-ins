@@ -1,0 +1,41 @@
+import {createRequire} from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const require=createRequire(import.meta.url);
+const {Miniflare}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
+const mf=new Miniflare({modules:[{type:'ESModule',path:'dist/server/index.js'},...fs.readdirSync('dist/server',{recursive:true}).filter(p=>p.endsWith('.js')&&p!=='index.js').map(p=>({type:'ESModule',path:'dist/server/'+p}))],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['BUCKET'],cf:false});
+let count=0;
+async function api(body,path='/api/academy',expected=200){const r=await mf.dispatchFetch('http://academy.test'+path,body?{method:'POST',headers:{'Content-Type':'application/json','Origin':'http://academy.test'},body:JSON.stringify(body)}:{});const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));count++;return d;}
+try{
+const db=await mf.getD1Database('DB');for(const sql of fs.readFileSync('drizzle/0000_exotic_veda.sql','utf8').split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+await api({action:'seed'});const initial=await api();assert.equal(initial.courses.length,4);
+const course=await api(null,'/api/academy?course=orientacao');assert.equal(course.lessons.length,3);assert.equal(course.questions.length,5);assert(!JSON.stringify(course).includes('"answer"'));
+const e=await api({action:'enroll',courseId:'orientacao',participant:'Teste — QA',province:'Maputo Cidade'});
+await api({action:'certificate',enrollmentId:e.id},'/api/academy',400);
+await api({action:'complete',enrollmentId:e.id,lessonId:'unknown'},'/api/academy',400);
+const attempt='qa-attempt-1';await api({action:'submit',enrollmentId:e.id,answers:{Q1:0,Q2:1,Q3:1,Q4:2,Q5:1},requestId:attempt});
+await api({action:'certificate',enrollmentId:e.id},'/api/academy',400);
+await api({action:'submit',enrollmentId:e.id,answers:{Q1:0,Q2:1,Q3:1,Q4:2,Q5:1},requestId:attempt});
+for(const l of course.lessons)await api({action:'complete',enrollmentId:e.id,lessonId:l.id});
+await api({action:'complete',enrollmentId:e.id,lessonId:'L1'});
+const state=await api();assert.equal(state.enrollments[0].done,3);assert.equal(state.enrollments[0].attempts.length,1);assert.equal(state.enrollments[0].best,100);assert.equal(state.enrollments[0].eligible,true);
+const cert=await api({action:'certificate',enrollmentId:e.id});const cert2=await api({action:'certificate',enrollmentId:e.id});assert.equal(cert.id,cert2.id);
+const pdf=await mf.dispatchFetch('http://academy.test/api/certificate/'+cert.id);assert.equal(pdf.status,200);const bytes=new Uint8Array(await pdf.arrayBuffer());assert(new TextDecoder().decode(bytes.slice(0,4))==='%PDF');fs.writeFileSync(path.join(os.tmpdir(),'academy-test-certificate.pdf'),bytes);count++;
+const verify=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert.equal(verify.status,200);assert((await verify.text()).includes('Registo de demonstração válido'));count++;
+await api({action:'revoke',id:cert.id,reason:'Teste de revogação'});
+const revoked=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert((await revoked.text()).includes('Certificado revogado'));count++;
+const c=await api({action:'course',title:'Curso de teste editorial',summary:'Objectivo de teste',category:'Formação',hours:2,pass:80});
+await api({action:'transition',id:c.id,status:'publicado',comment:'Inválido'},'/api/academy',400);
+await api({action:'transition',id:c.id,status:'em_revisao',comment:'Sem aulas'},'/api/academy',400);
+await api({action:'lesson',courseId:c.id,module:'Módulo 1',title:'Aula de teste',body:'Conteúdo de teste'});
+await api({action:'question',courseId:c.id,prompt:'Questão de teste',options:['A','B'],answer:0,explanation:'Resposta A'});
+for(const status of ['em_revisao','aprovado','publicado'])await api({action:'transition',id:c.id,status,comment:'Decisão controlada de teste'});
+await api({action:'course',id:c.id,title:'Não deve alterar',summary:'Teste',category:'Teste',hours:1,pass:80},'/api/academy',400);
+const copy=await api({action:'duplicate',id:c.id});const copyData=await api(null,'/api/academy?course='+copy.id);assert.equal(copyData.lessons.length,1);assert.equal(copyData.course.status,'rascunho');
+await api({action:'cohort',courseId:c.id,title:'Turma de teste',trainer:'Formador de teste',starts:'2026-10-01',ends:'2026-10-10',capacity:25});
+const fd=new FormData();fd.append('file',new File([bytes],'certificado-teste.pdf',{type:'application/pdf'}));const encoded=new Request('http://academy.test/api/media',{method:'POST',body:fd});const upload=await mf.dispatchFetch(encoded.url,{method:'POST',headers:{Origin:'http://academy.test','Content-Type':encoded.headers.get('content-type')},body:await encoded.arrayBuffer()});const media=await upload.json();assert.equal(upload.status,200,JSON.stringify(media));const file=await mf.dispatchFetch('http://academy.test/api/media/'+media.id);assert.equal(file.status,200);assert.equal((await file.arrayBuffer()).byteLength,bytes.length);count+=2;
+const root=await mf.dispatchFetch('http://academy.test/');assert.equal(root.status,200);assert((await root.text()).includes('Academia Digital'));count++;
+console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR']},null,2));
+}finally{await mf.dispose();}
