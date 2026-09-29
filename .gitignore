@@ -45,5 +45,4 @@ next-env.d.ts
 /outputs/
 /work/
 
-# Cache gerada pelo TypeScript
 *.tsbuildinfo

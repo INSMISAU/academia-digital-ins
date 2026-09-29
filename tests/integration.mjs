@@ -5,11 +5,12 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url);
 const {Miniflare}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
+const adminHeaders={'oai-authenticated-user-id':'test-owner-identity','oai-authenticated-user-email':'perciliamuianga@gmail.com'};
 const mf=new Miniflare({modules:[{type:'ESModule',path:'dist/server/index.js'},...fs.readdirSync('dist/server',{recursive:true}).filter(p=>p.endsWith('.js')&&p!=='index.js').map(p=>({type:'ESModule',path:'dist/server/'+p}))],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['BUCKET'],cf:false});
 let count=0;
-async function api(body,path='/api/academy',expected=200){const r=await mf.dispatchFetch('http://academy.test'+path,body?{method:'POST',headers:{'Content-Type':'application/json','Origin':'http://academy.test'},body:JSON.stringify(body)}:{});const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));count++;return d;}
+async function api(body,path='/api/academy',expected=200){const r=await mf.dispatchFetch('http://academy.test'+path,body?{method:'POST',headers:{...adminHeaders,'Content-Type':'application/json','Origin':'http://academy.test'},body:JSON.stringify(body)}:{headers:adminHeaders});const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));count++;return d;}
 try{
-const db=await mf.getD1Database('DB');for(const sql of fs.readFileSync('drizzle/0000_exotic_veda.sql','utf8').split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+const db=await mf.getD1Database('DB');for(const migration of fs.readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())for(const sql of fs.readFileSync('drizzle/'+migration,'utf8').split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
 await api({action:'seed'});const initial=await api();assert.equal(initial.courses.length,4);
 const course=await api(null,'/api/academy?course=orientacao');assert.equal(course.lessons.length,3);assert.equal(course.questions.length,5);assert(!JSON.stringify(course).includes('"answer"'));
 const e=await api({action:'enroll',courseId:'orientacao',participant:'Teste — QA',province:'Maputo Cidade'});
@@ -22,7 +23,7 @@ for(const l of course.lessons)await api({action:'complete',enrollmentId:e.id,les
 await api({action:'complete',enrollmentId:e.id,lessonId:'L1'});
 const state=await api();assert.equal(state.enrollments[0].done,3);assert.equal(state.enrollments[0].attempts.length,1);assert.equal(state.enrollments[0].best,100);assert.equal(state.enrollments[0].eligible,true);
 const cert=await api({action:'certificate',enrollmentId:e.id});const cert2=await api({action:'certificate',enrollmentId:e.id});assert.equal(cert.id,cert2.id);
-const pdf=await mf.dispatchFetch('http://academy.test/api/certificate/'+cert.id);assert.equal(pdf.status,200);const bytes=new Uint8Array(await pdf.arrayBuffer());assert(new TextDecoder().decode(bytes.slice(0,4))==='%PDF');fs.writeFileSync(path.join(os.tmpdir(),'academy-test-certificate.pdf'),bytes);count++;
+const pdf=await mf.dispatchFetch('http://academy.test/api/certificate/'+cert.id,{headers:adminHeaders});assert.equal(pdf.status,200);const bytes=new Uint8Array(await pdf.arrayBuffer());assert(new TextDecoder().decode(bytes.slice(0,4))==='%PDF');fs.writeFileSync(path.join(os.tmpdir(),'academy-test-certificate.pdf'),bytes);count++;
 const verify=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert.equal(verify.status,200);assert((await verify.text()).includes('Registo de demonstração válido'));count++;
 await api({action:'revoke',id:cert.id,reason:'Teste de revogação'});
 const revoked=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert((await revoked.text()).includes('Certificado revogado'));count++;
@@ -35,7 +36,33 @@ for(const status of ['em_revisao','aprovado','publicado'])await api({action:'tra
 await api({action:'course',id:c.id,title:'Não deve alterar',summary:'Teste',category:'Teste',hours:1,pass:80},'/api/academy',400);
 const copy=await api({action:'duplicate',id:c.id});const copyData=await api(null,'/api/academy?course='+copy.id);assert.equal(copyData.lessons.length,1);assert.equal(copyData.course.status,'rascunho');
 await api({action:'cohort',courseId:c.id,title:'Turma de teste',trainer:'Formador de teste',starts:'2026-10-01',ends:'2026-10-10',capacity:25});
-const fd=new FormData();fd.append('file',new File([bytes],'certificado-teste.pdf',{type:'application/pdf'}));const encoded=new Request('http://academy.test/api/media',{method:'POST',body:fd});const upload=await mf.dispatchFetch(encoded.url,{method:'POST',headers:{Origin:'http://academy.test','Content-Type':encoded.headers.get('content-type')},body:await encoded.arrayBuffer()});const media=await upload.json();assert.equal(upload.status,200,JSON.stringify(media));const file=await mf.dispatchFetch('http://academy.test/api/media/'+media.id);assert.equal(file.status,200);assert.equal((await file.arrayBuffer()).byteLength,bytes.length);count+=2;
+const fd=new FormData();fd.append('file',new File([bytes],'certificado-teste.pdf',{type:'application/pdf'}));const encoded=new Request('http://academy.test/api/media',{method:'POST',body:fd});const upload=await mf.dispatchFetch(encoded.url,{method:'POST',headers:{...adminHeaders,Origin:'http://academy.test','Content-Type':encoded.headers.get('content-type')},body:await encoded.arrayBuffer()});const media=await upload.json();assert.equal(upload.status,200,JSON.stringify(media));const file=await mf.dispatchFetch('http://academy.test/api/media/'+media.id,{headers:adminHeaders});assert.equal(file.status,200);assert.equal((await file.arrayBuffer()).byteLength,bytes.length);count+=2;
+// Anonymous visitors: full learning path, isolation, admin denials and CSRF.
+async function guest(body=null,cookie='',route='/api/academy',expected=200,headers={}){
+ const r=await mf.dispatchFetch('http://academy.test'+route,{...(body?{method:'POST',body:JSON.stringify(body)}:{}),headers:{...(body?{'Content-Type':'application/json',Origin:'http://academy.test'}:{}),...(cookie?{Cookie:cookie}:{}),...headers}});
+ const text=await r.text();assert.equal(r.status,expected,text);count++;let d;try{d=JSON.parse(text);}catch{}return {d,cookie:r.headers.get('set-cookie')?.split(';')[0],text};
+}
+const pub=await guest();assert.equal(pub.d.isAdmin,false);assert(pub.d.courses.every(c=>c.status==='publicado'));assert.equal(pub.d.enrollments.length,0);assert.equal(pub.d.audit.length,0);assert.equal(pub.d.media.length,0);assert.equal(pub.d.certificates.length,0);
+await guest(null,'','/api/academy?course=biosseguranca',404);
+for(const action of ['seed','course','lesson','question','transition','duplicate','revoke','cohort'])await guest({action},'','/api/academy',403);
+await guest({action:'seed'},'','/api/academy',403,{'oai-authenticated-user-email':'perciliamuianga@gmail.com'});
+await guest({action:'seed'},'','/api/academy',403,{'oai-authenticated-user-id':'other','oai-authenticated-user-email':'other@example.test'});
+const ga=await guest({action:'enroll',courseId:'orientacao'});assert(ga.cookie);assert(ga.cookie.startsWith('__Host-academy-demo='));
+const gb=await guest({action:'enroll',courseId:'orientacao'});assert(gb.cookie&&gb.cookie!==ga.cookie);assert.notEqual(ga.d.id,gb.d.id);
+const ra=await guest(null,ga.cookie);assert.equal(ra.d.enrollments.length,1);assert.equal(ra.d.enrollments[0].id,ga.d.id);assert(!ra.text.includes('visitorKey'));assert(!ra.text.includes(gb.d.id));
+assert.equal((await guest({action:'enroll',courseId:'orientacao'},ga.cookie)).d.id,ga.d.id);
+for(const action of ['complete','submit','certificate'])await guest({action,enrollmentId:ga.d.id,lessonId:'L1'},gb.cookie,'/api/academy',403);
+await guest({action:'complete',enrollmentId:e.id,lessonId:'L1'},ga.cookie,'/api/academy',403);
+await guest({action:'complete',enrollmentId:ga.d.id,lessonId:'L1'},ga.cookie,'/api/academy',403,{Origin:'http://attacker.test'});
+for(const l of course.lessons)await guest({action:'complete',enrollmentId:ga.d.id,lessonId:l.id},ga.cookie);
+await guest({action:'submit',enrollmentId:ga.d.id,answers:{Q1:0,Q2:1,Q3:1,Q4:2,Q5:1},requestId:'guest-a-attempt'},ga.cookie);
+const gc=await guest({action:'certificate',enrollmentId:ga.d.id},ga.cookie);
+const gp=await mf.dispatchFetch('http://academy.test/api/certificate/'+gc.d.id,{headers:{Cookie:ga.cookie}});assert.equal(gp.status,200);assert((await gp.text()).startsWith('%PDF'));count++;
+await guest(null,gb.cookie,'/api/certificate/'+gc.d.id,404);
+await guest(null,'','/api/certificate/'+cert.id,404);
+await guest(null,ga.cookie,'/api/media/'+media.id,403);
+await guest({file:'invalid'},ga.cookie,'/api/media',403);
+assert.equal((await guest(null,gb.cookie)).d.certificates.length,0);
 const root=await mf.dispatchFetch('http://academy.test/');assert.equal(root.status,200);assert((await root.text()).includes('Academia Digital'));count++;
 console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR']},null,2));
 }finally{await mf.dispose();}

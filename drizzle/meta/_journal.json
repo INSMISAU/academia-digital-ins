@@ -8,6 +8,13 @@
       "when": 1790720209302,
       "tag": "0000_exotic_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790725256062,
+      "tag": "0001_soft_the_call",
+      "breakpoints": true
     }
   ]
 }
