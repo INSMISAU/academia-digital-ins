@@ -1,3 +1,4 @@
+import {withPagesCors,pagesPreflight,permittedOrigin} from '@/lib/academy-cors';
 import {isAdmin,visitorToken,visitorKey,newVisitorToken,visitorCookie,ownsEnrollment} from '@/db/access';
 import {db,all,one,now,uid,log} from '@/db/store';
 import {env} from 'cloudflare:workers';
@@ -8,7 +9,7 @@ const num=(x:any,min:number,max:number)=>{const n=Number(x);if(!Number.isInteger
 async function course(id:string){const c=await one('SELECT * FROM courses WHERE id=?',id);if(!c)throw Error('Curso não encontrado.');return c;}
 async function editable(id:string){const c=await course(id);if(c.status!=='rascunho')throw Error('Só é possível editar cursos em rascunho.');return c;}
 async function stats(eid:string){const e=await one('SELECT * FROM enrollments WHERE id=?',eid);if(!e)throw Error('Inscrição não encontrada.');const c=await course(e.courseId);const total=await one('SELECT count(*) n FROM lessons WHERE courseId=?',c.id);const done=await one('SELECT count(*) n FROM progress p JOIN lessons l ON l.id=p.lessonId WHERE p.enrollmentId=? AND l.courseId=?',eid,c.id);const best=await one('SELECT MAX(score) score FROM attempts WHERE enrollmentId=?',eid);return {e,c,total:total.n,done:done.n,best:best.score??null,eligible:total.n>0&&done.n===total.n&&best.score!==null&&best.score>=c.pass};}
-export async function GET(req:Request){try{
+async function getAcademy(req:Request){try{
  const admin=isAdmin(req),key=await visitorKey(visitorToken(req)),u=new URL(req.url);
  if(u.searchParams.has('course')){
   const c=await course(u.searchParams.get('course')!);
@@ -25,7 +26,7 @@ export async function GET(req:Request){try{
  certificates:await all('SELECT ct.*,e.participant,c.title,c.hours FROM certificates ct JOIN enrollments e ON e.id=ct.enrollmentId JOIN courses c ON c.id=e.courseId '+(admin?'':'WHERE e.visitorKey=? ')+'ORDER BY ct.created DESC',...(admin?[]:[key])),
  media:admin?await all('SELECT * FROM media ORDER BY created DESC'):[],audit:admin?await all('SELECT * FROM audit ORDER BY created DESC LIMIT 100'):[]});
  }catch(e:any){console.error(e);return json({error:'Não foi possível carregar os dados da Academia. Tente novamente.'},503);}}
-export async function POST(req:Request){try{const origin=req.headers.get('origin');if(origin!==new URL(req.url).origin)return json({error:'Origem não autorizada.'},403);if(Number(req.headers.get('content-length')||0)>250000)return json({error:'Pedido demasiado grande.'},413);
+async function postAcademy(req:Request){try{if(!permittedOrigin(req))return json({error:'Origem não autorizada.'},403);if(Number(req.headers.get('content-length')||0)>250000)return json({error:'Pedido demasiado grande.'},413);
 const b:any=await req.json();const a=b.action;const admin=isAdmin(req);let token=visitorToken(req),setCookie=false;
 if(!admin&&!['enroll','complete','submit','certificate'].includes(a))return json({error:'Operação reservada à administração.'},403);
 if(['complete','submit','certificate'].includes(a)&&!await ownsEnrollment(req,str(b.enrollmentId)))return json({error:'Percurso indisponível nesta sessão.'},403);
@@ -70,3 +71,7 @@ if(a==='seed'){
 }else throw Error('Operação desconhecida.');
 if(statements.length)await db().batch(statements);const response=json(result);if(setCookie&&token)response.headers.set('Set-Cookie',visitorCookie(token));return response;
 }catch(e:any){console.error(e);return json({error:e.message||'Não foi possível guardar. Tente novamente.'},400);}}
+
+export function GET(req:Request){return withPagesCors(req,()=>getAcademy(req));}
+export function POST(req:Request){return withPagesCors(req,()=>postAcademy(req));}
+export function OPTIONS(req:Request){return pagesPreflight(req);}

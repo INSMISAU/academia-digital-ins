@@ -63,6 +63,45 @@ await guest(null,'','/api/certificate/'+cert.id,404);
 await guest(null,ga.cookie,'/api/media/'+media.id,403);
 await guest({file:'invalid'},ga.cookie,'/api/media',403);
 assert.equal((await guest(null,gb.cookie)).d.certificates.length,0);
+// GitHub Pages: anonymous bearer sessions without cross-site cookies.
+const pagesOrigin='https://insmisau.github.io';
+const paToken='a'.repeat(64),pbToken='b'.repeat(64);
+async function pages(body=null,token=paToken,route='/api/academy',expected=200,extra={}){
+ const response=await mf.dispatchFetch('http://academy.test'+route,{
+  ...(body?{method:'POST',body:JSON.stringify(body)}:{}),
+  headers:{Origin:pagesOrigin,Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{}),...extra}
+ });
+ assert.equal(response.status,expected,await response.clone().text());
+ assert.equal(response.headers.get('Access-Control-Allow-Origin'),pagesOrigin);
+ assert.equal(response.headers.get('Access-Control-Allow-Credentials'),null);
+ assert.equal(response.headers.get('Set-Cookie'),null);
+ count++;
+ return response;
+}
+const preflight=await mf.dispatchFetch('http://academy.test/api/academy',{method:'OPTIONS',headers:{Origin:pagesOrigin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization,content-type'}});
+assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),pagesOrigin);count++;
+for(const headers of [{Origin:'https://other.example'},{Origin:pagesOrigin,'Access-Control-Request-Headers':'oai-authenticated-user-email'},{Origin:pagesOrigin,'Access-Control-Request-Method':'DELETE'}]){
+ const denied=await mf.dispatchFetch('http://academy.test/api/academy',{method:'OPTIONS',headers:{Origin:pagesOrigin,'Access-Control-Request-Method':'POST',...headers}});assert.equal(denied.status,403);count++;
+}
+const publicPages=await (await pages()).json();assert.equal(publicPages.isAdmin,false);assert.equal(publicPages.enrollments.length,0);
+const cookieOnly=await mf.dispatchFetch('http://academy.test/api/academy',{headers:{Origin:pagesOrigin,Cookie:ga.cookie,...adminHeaders}});assert.equal(cookieOnly.status,401);count++;
+const badToken=await pages(null,'invalid','/api/academy',401);
+assert.equal((await (await pages(null,paToken,'/api/academy',200,{...adminHeaders,Cookie:ga.cookie})).json()).isAdmin,false);
+await pages({action:'seed'},paToken,'/api/academy',403,adminHeaders);
+const pa=await (await pages({action:'enroll',courseId:'orientacao'})).json();
+const pb=await (await pages({action:'enroll',courseId:'orientacao'},pbToken)).json();assert.notEqual(pa.id,pb.id);
+assert.equal((await (await pages({action:'enroll',courseId:'orientacao'})).json()).id,pa.id);
+const resumed=await (await pages()).json();assert.equal(resumed.enrollments.length,1);assert.equal(resumed.enrollments[0].id,pa.id);assert(!JSON.stringify(resumed).includes('visitorKey'));
+for(const action of ['complete','submit','certificate'])await pages({action,enrollmentId:pa.id,lessonId:'L1'},pbToken,'/api/academy',403);
+for(const lesson of course.lessons)await pages({action:'complete',enrollmentId:pa.id,lessonId:lesson.id});
+await pages({action:'submit',enrollmentId:pa.id,answers:{Q1:0,Q2:1,Q3:1,Q4:2,Q5:1},requestId:'pages-a-attempt'});
+const pc=await (await pages({action:'certificate',enrollmentId:pa.id})).json();
+const pp=await pages(null,paToken,'/api/certificate/'+pc.id);assert.equal(pp.headers.get('Content-Type'),'application/pdf');assert((await pp.text()).startsWith('%PDF'));
+await pages(null,pbToken,'/api/certificate/'+pc.id,404);
+const pdfPreflight=await mf.dispatchFetch('http://academy.test/api/certificate/'+pc.id,{method:'OPTIONS',headers:{Origin:pagesOrigin,'Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'authorization'}});assert.equal(pdfPreflight.status,204);count++;
+const otherOrigin=await mf.dispatchFetch('http://academy.test/api/academy',{method:'POST',headers:{Origin:'https://other.example',Authorization:'Bearer '+paToken,'Content-Type':'application/json'},body:JSON.stringify({action:'enroll',courseId:'orientacao'})});assert.equal(otherOrigin.status,403);assert.equal(otherOrigin.headers.get('Access-Control-Allow-Origin'),null);count++;
+// Existing cookie users retain their original records after the Pages addition.
+const originalSession=await guest(null,ga.cookie);assert.equal(originalSession.d.enrollments[0].id,ga.d.id);assert.equal(originalSession.d.certificates[0].id,gc.d.id);
 const root=await mf.dispatchFetch('http://academy.test/');assert.equal(root.status,200);assert((await root.text()).includes('Academia Digital'));count++;
-console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR']},null,2));
+console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR','Pages CORS/preflight','Pages learning and PDF','bearer session isolation','cookie continuity','cross-origin administration denied']},null,2));
 }finally{await mf.dispose();}

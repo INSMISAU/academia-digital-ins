@@ -1,5 +1,7 @@
 # Academia Digital do INS — versão de demonstração
 
+> Registo da entrega inicial. Para a adaptação ao GitHub Pages e os testes de 16/10/2026, consultar [GitHub Pages](GITHUB_PAGES.md) e [Histórico](HISTORICO_PAGES_20261016.md).
+
 ## Estado
 Versão integrada para demonstração por link, com administração reservada à proprietária autenticada. Não constitui o produto nacional concluído. Apenas dados fictícios; sem certificação oficial. Independente do Manual e do CMS existentes.
 

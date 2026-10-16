@@ -4,9 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Academia Digital do INS",
   description: "Formação, aprendizagem e gestão institucional. Ambiente de desenvolvimento e demonstração.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
