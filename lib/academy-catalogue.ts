@@ -1,3 +1,4 @@
+import {courseOverview} from './academy-content';
 export type CatalogueFilters = {search: string; category: string; mode: string; order: string};
 export const defaultCatalogue: CatalogueFilters = {search: '', category: 'todas', mode: 'todos', order: 'recentes'};
 export const publicViews = ['inicio', 'catalogo', 'categorias', 'biblioteca', 'aprender', 'certificados', 'sobre'];
@@ -19,7 +20,7 @@ export function filterCatalogue(courses: any[], filters: CatalogueFilters, manag
     (state === 'todos' || c.status === state) &&
     (filters.category === 'todas' || c.category === filters.category) &&
     (filters.mode === 'todos' || (filters.mode === 'academia' ? !c.external : !!c.external)) &&
-    normaliseSearch([c.title, c.category, c.summary].join(' ')).includes(query)
+    normaliseSearch([c.title, c.category, ...Object.values(courseOverview(c.summary))].join(' ')).includes(query)
   );
   return result.sort((a, b) => {
     if (filters.order === 'titulo') return a.title.localeCompare(b.title, 'pt');

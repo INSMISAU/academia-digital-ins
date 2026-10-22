@@ -6,6 +6,12 @@ const lifetime = 30 * 24 * 60 * 60 * 1000;
 type Session = {token: string; expires: number};
 let memorySession: Session | undefined;
 
+// Works in HTTPS and in the supervised HTTP preview; request IDs do not carry
+// identity or permissions. Authentication continues to use the session token.
+export function academyRequestId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function sessionToken() {
   let session = memorySession;
   try {

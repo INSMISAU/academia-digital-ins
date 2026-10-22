@@ -304,3 +304,49 @@ body{font-family:Arial,Helvetica,sans-serif;color:#19333f;font-size:16px;backgro
 .academy-resource h2{font-size:23px;line-height:1.35;color:#294653;margin:0 0 10px}
 .academy-resource p{color:#516b77;margin-bottom:20px}
 @media(max-width:600px){.institutional-hero{padding:28px 22px}.institutional-hero h1{font-size:34px}.institutional-logo{width:60px;height:42px}.institutional-brand{font-size:18px}.academy-resource{padding:22px;gap:14px}.academy-resource h2{font-size:20px}}
+/* Course overview and block editor — retain the institutional palette. */
+.course-overview {display: grid; gap: 1.15rem; margin: 1.25rem 0 1.5rem;}
+.course-overview h3 {font-size: 1rem; font-weight: 650; margin-bottom: .45rem;}
+.course-overview p,.course-overview li {line-height: 1.75; white-space: pre-line;}
+.course-overview ul,.academy-content ul {list-style: disc; padding-left: 1.4rem;}
+.course-modality {display: flex; align-items: center; gap: .5rem; font-weight: 600;}
+.course-programme {margin: 1.75rem 0;}
+.course-programme>h3 {font-size: 1.15rem; font-weight: 650; margin-bottom: 1rem;}
+.programme-module {border: 1px solid #dce6e0; border-radius: .65rem; overflow: hidden; margin: .75rem 0;}
+.programme-module header {display:flex; align-items:center; justify-content:space-between; gap:1rem; background:#f1f6f3; padding:1rem;}
+.programme-module header h4 {font-weight:650; margin-top:.2rem;}
+.programme-module header>span {font-size:.85rem; white-space:nowrap;}
+.programme-module ol {list-style:decimal; padding:0 1rem 0 2.5rem;}
+.programme-module li {padding:1rem 0; border-top:1px solid #e3eae6;}
+.programme-module li p {font-size:.875rem; line-height:1.6; color:#52675d; margin:.3rem 0; overflow-wrap:anywhere;}
+.academy-content {line-height:1.8; overflow-wrap:anywhere;}
+.academy-content h3 {font-size:1.2rem; font-weight:650; margin:1.8rem 0 .8rem;}
+.academy-content .content-text p {margin:1rem 0; white-space:pre-line;}
+.academy-content.align-justify .content-text,.academy-content.align-justify>ul {text-align:justify; text-justify:inter-word;}
+.academy-content>ul {margin:1rem 0;}
+.content-resource {border:1px solid #dce6e0; border-radius:.65rem; padding:1rem; margin:1.4rem 0; background:#f8faf9;}
+.content-resource img,.content-resource video {max-width:100%; max-height:36rem; height:auto; display:block; margin:auto; border-radius:.3rem;}
+.content-resource iframe {width:100%; aspect-ratio:16/9; border:0;}
+.content-resource audio {width:100%;}
+.content-resource figcaption {margin-top:.75rem;}
+.content-resource a {display:inline-flex; gap:.5rem; align-items:center; color:#126a49; font-weight:600; text-decoration:underline;}
+.content-resource small {display:block; color:#52675d; margin-top:.4rem;}
+.content-unavailable {padding:1rem; border:1px solid #dce6e0; border-radius:.5rem;}
+.academy-editor .field select {width:100%; border:1px solid #cbd7d0; border-radius:.4rem; padding:.55rem; background:white; min-height:2.5rem;}
+.editor-switch {display:flex; gap:.5rem; flex-wrap:wrap;}
+.editor-help {font-size:.875rem; color:#52675d; line-height:1.65;}
+.editor-blocks {display:grid; gap:1rem;}
+.editor-block {border:1px solid #d2e0d8; padding:1rem; border-radius:.65rem; display:grid; gap:.8rem; min-width:0;}
+.editor-block>header {display:flex; justify-content:space-between; align-items:center; gap:.5rem;}
+.editor-block>header strong {display:flex; align-items:center; gap:.4rem; font-size:.9rem;}
+.editor-block>header strong span {cursor:grab; padding:.4rem;}
+.editor-block>header>div {display:flex;}
+.editor-block textarea {min-height:7rem;}
+.editor-add {display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap;}
+.editor-add .field {flex:1; min-width:12rem;}
+.editor-preview {border:1px solid #dce6e0; border-radius:.65rem; padding:1.25rem;}
+.editor-preview>h2 {font-size:1.5rem; font-weight:650; margin:1rem 0;}
+.editor-error {color:#a52626; background:#fff2f2; border-radius:.4rem; padding:.75rem;}
+@media(max-width:600px){.editor-block {padding:.65rem;}.editor-block>header {align-items:flex-start;}.editor-block>header strong {font-size:.8rem;}.editor-add>button {width:100%;}.programme-module header {padding:.75rem;}}
+
+.editor-fields {display:grid; gap:1rem; min-width:0; border:0; padding:0; margin:0;}

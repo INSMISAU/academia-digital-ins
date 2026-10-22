@@ -20,6 +20,7 @@ function client(origin, storage = localStorage) {
   return context.exports;
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
+const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
 await client(origin).academyFetch('/api/academy');
 const first = requests.at(-1);
 assert.equal(first.url, origin + '/api/academy');

@@ -28,13 +28,21 @@ const verify=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);ass
 await api({action:'revoke',id:cert.id,reason:'Teste de revogação'});
 const revoked=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert((await revoked.text()).includes('Certificado revogado'));count++;
 const c=await api({action:'course',title:'Curso de teste editorial',summary:'Objectivo de teste',category:'Formação',hours:2,pass:80});
+// Structured content uses the existing API contract: save, reload, snapshot and
+// version copy must preserve every field without a schema/backend change.
+const richSummary='INS_ACADEMY_COURSE_V1\n'+JSON.stringify({summary:'Resumo QA',objectives:'Objectivo QA',audience:'Equipa QA',prerequisites:'',modality:'Online'});
+const richBody='INS_ACADEMY_LESSON_V1\n'+JSON.stringify({align:'justify',blocks:[{id:'qa-text',type:'text',text:'Texto QA',url:'',title:'',alt:'',source:''},{id:'qa-pdf',type:'pdf',text:'Nota QA',url:'https://example.test/manual.pdf',title:'PDF QA',alt:'',source:'Fonte QA'}]});
+await api({action:'course',id:c.id,title:'Curso de teste editorial',summary:richSummary,category:'Formação',hours:2,pass:80});
 await api({action:'transition',id:c.id,status:'publicado',comment:'Inválido'},'/api/academy',400);
 await api({action:'transition',id:c.id,status:'em_revisao',comment:'Sem aulas'},'/api/academy',400);
-await api({action:'lesson',courseId:c.id,module:'Módulo 1',title:'Aula de teste',body:'Conteúdo de teste'});
+await api({action:'lesson',courseId:c.id,module:'Módulo 1',title:'Aula de teste',body:richBody});
+const savedContent=await api(null,'/api/academy?course='+c.id);assert.equal(savedContent.course.summary,richSummary);assert.equal(savedContent.lessons[0].body,richBody);
 await api({action:'question',courseId:c.id,prompt:'Questão de teste',options:['A','B'],answer:0,explanation:'Resposta A'});
 for(const status of ['em_revisao','aprovado','publicado'])await api({action:'transition',id:c.id,status,comment:'Decisão controlada de teste'});
 await api({action:'course',id:c.id,title:'Não deve alterar',summary:'Teste',category:'Teste',hours:1,pass:80},'/api/academy',400);
 const copy=await api({action:'duplicate',id:c.id});const copyData=await api(null,'/api/academy?course='+copy.id);assert.equal(copyData.lessons.length,1);assert.equal(copyData.course.status,'rascunho');
+assert.equal(copyData.course.summary,richSummary);assert.equal(copyData.lessons[0].body,richBody);
+const snapshot=JSON.parse((await db.prepare('SELECT content FROM snapshots WHERE courseId=?').bind(c.id).first()).content);assert.equal(snapshot.course.summary,richSummary);assert.equal(snapshot.lessons[0].body,richBody);
 await api({action:'cohort',courseId:c.id,title:'Turma de teste',trainer:'Formador de teste',starts:'2026-10-01',ends:'2026-10-10',capacity:25});
 const fd=new FormData();fd.append('file',new File([bytes],'certificado-teste.pdf',{type:'application/pdf'}));const encoded=new Request('http://academy.test/api/media',{method:'POST',body:fd});const upload=await mf.dispatchFetch(encoded.url,{method:'POST',headers:{...adminHeaders,Origin:'http://academy.test','Content-Type':encoded.headers.get('content-type')},body:await encoded.arrayBuffer()});const media=await upload.json();assert.equal(upload.status,200,JSON.stringify(media));const file=await mf.dispatchFetch('http://academy.test/api/media/'+media.id,{headers:adminHeaders});assert.equal(file.status,200);assert.equal((await file.arrayBuffer()).byteLength,bytes.length);count+=2;
 // Anonymous visitors: full learning path, isolation, admin denials and CSRF.

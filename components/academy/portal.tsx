@@ -1,4 +1,5 @@
 'use client';
+import {courseOverview} from '@/lib/academy-content';
 import {useState} from 'react';
 import {ArrowRight, ArrowUpRight, BookOpen, CheckCircle2, Clock, GraduationCap, Layers, Search, Award, Play, Compass} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -18,9 +19,9 @@ export function PublicCourseCard({course, enrollment, onOpen, onContinue, manage
       <span className="academy-category">{course.category}</span><BookOpen size={25} strokeWidth={1.5} aria-hidden="true"/>
     </div>
     <div className="academy-course-content">
-      <div className="academy-course-type">{management ? labels[course.status] : course.external ? 'Curso online' : 'Percurso na Academia'}{course.hours > 0 && <span><Clock size={14}/>{course.hours} h</span>}</div>
+      <div className="academy-course-type">{management ? labels[course.status] : course.external ? 'Curso online' : courseOverview(course.summary).modality || 'Percurso na Academia'}{course.hours > 0 && <span><Clock size={14}/>{course.hours} h</span>}</div>
       <h3>{course.title}</h3>
-      <p>{course.external ? 'Conteúdos e avaliações do curso.' : course.summary}</p>
+      <p>{course.external ? 'Conteúdos e avaliações do curso.' : courseOverview(course.summary).summary}</p>
       {!course.external && <div className="academy-course-facts"><span><Layers size={15}/>{course.lessons || 0} aulas</span><span>{course.questions || 0} questões</span></div>}
       {enrollment && <div className="academy-course-progress"><div><span>{enrollment.eligible ? 'Percurso concluído' : 'Aulas concluídas'}</span><strong>{lessonPercent(enrollment)}%</strong></div><Progress value={lessonPercent(enrollment)} aria-label="Percentagem de aulas concluídas"/></div>}
       <div className="academy-course-actions"><>{course.external && !management ? <a className="button-link" href={course.external}>Aceder ao curso<ArrowRight size={15}/></a> : <Button variant="outline" onClick={enrollment && !management ? onContinue : onOpen}>{management ? 'Gerir curso' : enrollment ? 'Continuar' : 'Ver curso'}<ArrowRight size={15}/></Button>}</></div>

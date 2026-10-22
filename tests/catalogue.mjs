@@ -6,7 +6,14 @@ import ts from 'typescript';
 const code = ts.transpileModule(readFileSync('lib/academy-catalogue.ts', 'utf8'), {
   compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022},
 }).outputText;
-const context = {exports: {}, URLSearchParams};
+const contentContext = {exports: {}, URL};
+vm.runInNewContext(ts.transpileModule(readFileSync('lib/academy-content.ts', 'utf8'), {
+  compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022},
+}).outputText, contentContext);
+const context = {exports: {}, URLSearchParams, require: name => {
+  if (name === './academy-content') return contentContext.exports;
+  throw Error('Unexpected import: ' + name);
+}};
 vm.runInNewContext(code, context);
 const {defaultCatalogue: defaults, filterCatalogue: filter, courseCategories: categories, catalogueHash, readCatalogueHash, lessonPercent, latestEnrollment} = context.exports;
 // Fixtures are test inputs only; they are never loaded into the catalogue or database.
@@ -25,6 +32,8 @@ assert.equal(ids(filter(courses, {...defaults,mode:'academia'})), 'a');
 assert.equal(ids(filter(courses, {...defaults,order:'duracao'})), 'a,b', 'Unknown duration sorts after known duration');
 assert.equal(ids(filter(courses, defaults, true, 'rascunho')), 'c', 'Editorial filters retain access to drafts for management');
 assert.equal(ids(courses), 'a,b,c', 'Sorting does not mutate the API response');
+const structured = {...courses[0], summary: contentContext.exports.encodeOverview({summary:'Resumo', objectives:'Objectivo pedagógico', audience:'Equipa nacional', prerequisites:'', modality:'Online'})};
+assert.equal(ids(filter([structured], {...defaults,search:'pedagogico'})), 'a', 'Search includes structured objectives without depending on format markers');
 assert.equal(categories(courses).length, 2, 'Draft-only areas stay out of the public categories');
 assert.equal(categories(courses).reduce((total, area) => total + area.count, 0), 2);
 const filters = {search:'água & saúde?',category:'Saúde pública',mode:'academia',order:'titulo'};
