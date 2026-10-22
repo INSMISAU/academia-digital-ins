@@ -54,7 +54,7 @@ export function AcademyAbout({onNavigate}: {onNavigate: (id: string) => void}) {
 }
 
 function EbookResource() {
-  return <article className="academy-resource"><BookOpen size={28} aria-hidden="true"/><div><h2>Manual de Detecção e Investigação de Surtos</h2><p>eBook · Material de consulta</p><a className="button-link" href="https://insmisau.github.io/manual-surtos-teste/">Consultar eBook<ArrowRight size={16}/></a></div></article>;
+  return <article className="academy-resource"><BookOpen size={28} aria-hidden="true"/><div><h2>Manual de Detecção e Investigação de Surtos</h2><p>eBook · Material de consulta</p><a className="button-link" href="https://insmisau.github.io/manual-surtos/">Consultar eBook<ArrowRight size={16}/></a></div></article>;
 }
 export function AcademyLibrary() {
   return <><div className="page-heading"><div><h1>Biblioteca</h1><p>Manuais e materiais de apoio à formação.</p></div></div><EbookResource/></>;
