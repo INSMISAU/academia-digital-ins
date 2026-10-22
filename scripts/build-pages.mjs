@@ -11,5 +11,6 @@ for (const name of await readdir('dist-pages/assets')) {
 }
 await copyFile('dist-pages/index.html', 'index.html');
 await copyFile('dist-pages/favicon.svg', 'favicon.svg');
+await copyFile('dist-pages/logo_ins.png', 'logo_ins.png');
 await writeFile('.nojekyll', '');
 console.log('GitHub Pages pronto: index.html, favicon.svg, assets/ e .nojekyll.');

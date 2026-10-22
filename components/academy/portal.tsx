@@ -18,7 +18,7 @@ export function PublicCourseCard({course, enrollment, onOpen, onContinue, manage
       <span className="academy-category">{course.category}</span><BookOpen size={25} strokeWidth={1.5} aria-hidden="true"/>
     </div>
     <div className="academy-course-content">
-      <div className="academy-course-type">{management ? labels[course.status] : course.external ? 'Curso externo' : 'Percurso na Academia'}{course.hours > 0 && <span><Clock size={14}/>{course.hours} h</span>}</div>
+      <div className="academy-course-type">{management ? labels[course.status] : course.external ? 'Curso online' : 'Percurso na Academia'}{course.hours > 0 && <span><Clock size={14}/>{course.hours} h</span>}</div>
       <h3>{course.title}</h3>
       <p>{course.external ? 'Conteúdos e avaliações do curso.' : course.summary}</p>
       {!course.external && <div className="academy-course-facts"><span><Layers size={15}/>{course.lessons || 0} aulas</span><span>{course.questions || 0} questões</span></div>}
@@ -32,7 +32,7 @@ export function CategoryGrid({courses, onSelect}: {courses: any[]; onSelect: (na
   return <div className="academy-categories">{courseCategories(courses).map((category, index) => <button className="academy-category-card" key={category.name} onClick={() => onSelect(category.name)}><span className="academy-category-number">{String(index + 1).padStart(2, '0')}</span><span><strong>{category.name}</strong><small>{category.count} {category.count === 1 ? 'curso disponível' : 'cursos disponíveis'}</small></span><ArrowUpRight size={22}/></button>)}</div>;
 }
 
-export function AcademyHome({courses, enrollments, onBrowse, onResume, courseCard}: {courses: any[]; enrollments: any[]; certificates: any[]; onBrowse: (query?: string, category?: string) => void; onNavigate: (id: string) => void; onResume: (enrollment: any) => void; courseCard: (course: any) => any}) {
+export function AcademyHome({courses, enrollments, onBrowse, onNavigate, onResume, courseCard}: {courses: any[]; enrollments: any[]; certificates: any[]; onBrowse: (query?: string, category?: string) => void; onNavigate: (id: string) => void; onResume: (enrollment: any) => void; courseCard: (course: any) => any}) {
   const [query, setQuery] = useState('');
   const published = courses.filter(c => c.status === 'publicado');
   const resume = latestEnrollment(enrollments);
@@ -40,15 +40,22 @@ export function AcademyHome({courses, enrollments, onBrowse, onResume, courseCar
     <section className="institutional-hero">
       <span className="eyebrow">INSTITUTO NACIONAL DE SAÚDE · MOÇAMBIQUE</span>
       <h1>Academia Digital</h1>
-      <p>Formação em saúde. Consulte os cursos e aceda aos conteúdos.</p>
+      <p>Formação em saúde. Aceda aos cursos e aos materiais de consulta.</p>
       <form className="academy-hero-search" onSubmit={e => {e.preventDefault(); onBrowse(query);}}><Search size={21} aria-hidden="true"/><label className="sr-only" htmlFor="academy-home-search">Pesquisar cursos</label><input id="academy-home-search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Pesquisar cursos"/><Button type="submit">Pesquisar<ArrowRight size={17}/></Button></form>
     </section>
     {resume && <section className="academy-resume"><div className="academy-resume-heading"><Play size={21}/><div><span className="eyebrow">CONTINUAR A APRENDER</span><h2>{resume.c.title}</h2><p>{resume.done} de {resume.total} aulas concluídas</p></div></div><Button onClick={() => onResume(resume)}>Continuar<ArrowRight size={17}/></Button></section>}
     <section className="academy-home-section"><div className="academy-section-heading"><h2>Cursos</h2><button className="text-button" onClick={() => onBrowse()}>Ver catálogo<ArrowRight size={17}/></button></div><div className="course-grid">{published.slice(0, 6).map(courseCard)}</div>{!published.length && <p>Ainda não existem cursos publicados.</p>}</section>
-    {published.length > 0 && <section className="academy-home-section"><div className="academy-section-heading"><h2>Áreas de formação</h2></div><CategoryGrid courses={published} onSelect={name => onBrowse('', name)}/></section>}
+    <section className="academy-home-section"><div className="academy-section-heading"><h2>Biblioteca</h2><button className="text-button" onClick={() => onNavigate('biblioteca')}>Ver Biblioteca<ArrowRight size={17}/></button></div><EbookResource/></section>
   </div>;
 }
 
 export function AcademyAbout({onNavigate}: {onNavigate: (id: string) => void}) {
   return <><div className="page-heading"><div><h1>Sobre a Academia</h1></div></div><section className="panel academy-about"><p>A Academia Digital do Instituto Nacional de Saúde reúne o acesso à formação em saúde e aos conteúdos dos cursos.</p><Button onClick={() => onNavigate('catalogo')}>Consultar cursos<ArrowRight size={16}/></Button></section></>;
+}
+
+function EbookResource() {
+  return <article className="academy-resource"><BookOpen size={28} aria-hidden="true"/><div><h2>Manual de Detecção e Investigação de Surtos</h2><p>eBook · Material de consulta</p><a className="button-link" href="https://insmisau.github.io/manual-surtos-teste/">Consultar eBook<ArrowRight size={16}/></a></div></article>;
+}
+export function AcademyLibrary() {
+  return <><div className="page-heading"><div><h1>Biblioteca</h1><p>Manuais e materiais de apoio à formação.</p></div></div><EbookResource/></>;
 }

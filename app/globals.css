@@ -284,3 +284,23 @@ body{font-family:Arial,Helvetica,sans-serif;color:#19333f;font-size:16px;backgro
 .institutional-header a:focus-visible,.institutional-management button:focus-visible{outline:2px solid #006b58;outline-offset:4px}
 @media(max-width:1000px){.institutional-header{flex-direction:column;align-items:flex-start;padding:18px 24px;gap:14px}.institutional-header nav{width:100%;gap:6px 20px}.institutional-hero .academy-hero-search{flex-wrap:nowrap}.institutional-hero .academy-hero-search button{width:auto}}
 @media(max-width:600px){.institutional-main{padding:22px 16px}.institutional-header{padding:16px}.institutional-header nav{gap:2px 15px}.institutional-header nav a{font-size:13px}.institutional-hero{padding:27px 20px}.institutional-hero h1{font-size:38px}.institutional-hero>p{font-size:15px}.institutional-hero .academy-hero-search{flex-wrap:wrap}.institutional-hero .academy-hero-search button{width:100%}.institutional-main .academy-section-heading{flex-direction:row;align-items:center}.institutional-main .academy-section-heading h2{font-size:24px}}
+
+/* Shared INS identity with the training module. */
+.institutional-shell{background:linear-gradient(120deg,#e5f0ef,#f2f6f6);color:#294653}
+.institutional-header{border-bottom:3px solid #487985}
+.institutional-brand{font-family:Arial,sans-serif;font-size:20px;color:#294653;white-space:normal}
+.institutional-brand small{letter-spacing:0;font-size:12px;color:#294653;line-height:1.5}
+.institutional-logo{width:72px;height:48px;object-fit:contain;flex-shrink:0}
+.institutional-header nav a{color:#3d6571}
+.institutional-header nav a[aria-current=page]{color:#315b68;border-color:#487985}
+.institutional-hero{background:linear-gradient(110deg,#304f5a,#3e6d78);border:0;border-radius:20px;padding:40px;color:#fff}
+.institutional-hero h1{font-family:Arial,sans-serif;font-size:46px;line-height:1.15;letter-spacing:-1px;color:white}
+.institutional-hero>.eyebrow,.institutional-hero>p{color:#fff}
+.institutional-hero>.eyebrow{letter-spacing:.05em}
+.academy-course-card,.academy-resource{border:1px solid #cedfe3;border-radius:14px;background:#fff}
+.academy-course-top.external-course{background:#e5eff0}
+.academy-resource{display:flex;gap:20px;padding:28px;align-items:flex-start;max-width:780px}
+.academy-resource>svg{color:#3e6d78;flex-shrink:0;margin-top:4px}
+.academy-resource h2{font-size:23px;line-height:1.35;color:#294653;margin:0 0 10px}
+.academy-resource p{color:#516b77;margin-bottom:20px}
+@media(max-width:600px){.institutional-hero{padding:28px 22px}.institutional-hero h1{font-size:34px}.institutional-logo{width:60px;height:42px}.institutional-brand{font-size:18px}.academy-resource{padding:22px;gap:14px}.academy-resource h2{font-size:20px}}
