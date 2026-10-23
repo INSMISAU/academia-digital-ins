@@ -29,14 +29,23 @@ function sessionToken() {
   return session.token;
 }
 
-export function academyUrl(path: string) { return academyOrigin + path; }
+export function academyValidation() {
+  return typeof location !== 'undefined' && new URLSearchParams(location.search).get('validacao') === '1';
+}
+export function academyUrl(path: string) {
+  if (academyValidation()) {
+    if (path.startsWith('/api/')) path = '/api/validation/' + path.slice(5);
+    else if (path.startsWith('/verify/')) path = '/validation' + path;
+  }
+  return academyOrigin + path;
+}
 
 export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins/';
 
-// Use top-level navigation for the existing administrative sign-in. The return
-// path is fixed and relative to that service, never supplied by a visitor.
-export function academyAdministrationUrl(isAdmin: boolean) {
-  return isAdmin ? '#gestao' : academyUrl('/signin-with-chatgpt?return_to=' + encodeURIComponent('/#gestao'));
+// Validation stays on the Academy entry point. It has its own server records;
+// this flag never changes authorization on the original administration API.
+export function academyAdministrationUrl(_isAdmin?: boolean) {
+  return '?validacao=1#gestao';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {

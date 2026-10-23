@@ -111,5 +111,60 @@ const otherOrigin=await mf.dispatchFetch('http://academy.test/api/academy',{meth
 // Existing cookie users retain their original records after the Pages addition.
 const originalSession=await guest(null,ga.cookie);assert.equal(originalSession.d.enrollments[0].id,ga.d.id);assert.equal(originalSession.d.certificates[0].id,gc.d.id);
 const root=await mf.dispatchFetch('http://academy.test/');assert.equal(root.status,200);assert((await root.text()).includes('Academia Digital'));count++;
-console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR','Pages CORS/preflight','Pages learning and PDF','bearer session isolation','cookie continuity','cross-origin administration denied']},null,2));
+// Shared administrative validation: no owner login, durable test-only tables.
+const tableNames=['courses','lessons','questions','enrollments','progress','attempts','certificates','cohorts','media','audit','reviews','snapshots'];
+async function originalRecords(){const out={};for(const table of tableNames)out[table]=(await db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()).results;return JSON.stringify(out);}
+const beforeValidation=await originalRecords();
+async function validation(body=null,token=paToken,route='/api/validation/academy',expected=200){return pages(body,token,route,expected);}
+const emptyValidation=await (await validation()).json();assert.equal(emptyValidation.isAdmin,true);assert.equal(emptyValidation.validation,true);assert.equal(emptyValidation.courses.length,0);
+await validation({action:'seed'});
+const validationA=await (await validation()).json();const validationB=await (await validation(null,pbToken)).json();
+assert.equal(validationA.courses.length,1);assert.deepEqual(validationA,validationB);assert.equal(validationA.courses[0].title,'Percurso de teste da Academia');
+assert.equal(validationA.courses[0].hours,0);assert.equal(validationA.enrollments.length,0);assert.equal(validationA.certificates.length,0);assert.equal(validationA.media.length,0);
+const sharedCourse=await (await validation({action:'course',title:'Teste — Equipa A',summary:'Ficha fictícia para validação',category:'Teste',hours:0,pass:80})).json();
+const seenByB=await (await validation(null,pbToken,'/api/validation/academy?course='+sharedCourse.id)).json();assert.equal(seenByB.course.title,'Teste — Equipa A');
+await validation({action:'lesson',courseId:sharedCourse.id,module:'Módulo de teste',title:'Aula de teste partilhada',body:richBody},pbToken);
+await validation({action:'question',courseId:sharedCourse.id,prompt:'Questão de teste partilhada',options:['Sim','Não'],answer:0,explanation:'Explicação de teste'});
+for(const status of ['em_revisao','aprovado','publicado'])await validation({action:'transition',id:sharedCourse.id,status,comment:'Decisão de teste da equipa'},pbToken);
+await validation({action:'course',id:sharedCourse.id,title:'Alteração inválida',summary:'Teste',category:'Teste',hours:0,pass:80},paToken,'/api/validation/academy',400);
+const sharedCopy=await (await validation({action:'duplicate',id:sharedCourse.id},pbToken)).json();const sharedCopyData=await (await validation(null,paToken,'/api/validation/academy?course='+sharedCopy.id)).json();assert.equal(sharedCopyData.course.status,'rascunho');assert.equal(sharedCopyData.lessons[0].body,richBody);
+const vs=await (await validation(null,paToken,'/api/validation/academy?course=orientacao')).json();assert.equal(vs.lessons.length,3);
+const ve=await (await validation({action:'enroll',courseId:'orientacao',participant:'Teste — Dispositivo A',province:'Maputo Cidade'})).json();
+await validation({action:'enroll',courseId:'orientacao',participant:'Teste — Dispositivo A',province:'Maputo Cidade'},pbToken,'/api/validation/academy',400);
+for(const lesson of vs.lessons)await validation({action:'complete',enrollmentId:ve.id,lessonId:lesson.id},pbToken);
+await validation({action:'submit',enrollmentId:ve.id,answers:{Q1:0,Q2:1,Q3:1,Q4:2,Q5:1},requestId:'validation-attempt'},pbToken);
+const vc=await (await validation({action:'certificate',enrollmentId:ve.id})).json();
+const vp=await validation(null,pbToken,'/api/validation/certificate/'+vc.id);assert.equal(vp.headers.get('Content-Type'),'application/pdf');assert((await vp.text()).startsWith('%PDF'));
+const vv=await mf.dispatchFetch('http://academy.test/validation/verify/'+vc.code);assert.equal(vv.status,200);assert((await vv.text()).includes('Registo de demonstração válido'));count++;
+const publicVerify=await mf.dispatchFetch('http://academy.test/verify/'+vc.code);assert(!(await publicVerify.text()).includes('Registo de demonstração válido'));count++;
+await validation({action:'revoke',id:vc.id,reason:'Revogação de teste'},pbToken);
+const vr=await mf.dispatchFetch('http://academy.test/validation/verify/'+vc.code);assert((await vr.text()).includes('Certificado revogado'));count++;
+await validation({action:'cohort',courseId:sharedCourse.id,title:'Turma de teste partilhada',trainer:'Formador de teste',starts:'2026-10-23',ends:'2026-10-24',capacity:25},pbToken);
+const validationForm=new FormData();validationForm.append('file',new File([bytes],'material-partilhado-teste.pdf',{type:'application/pdf'}));const uploadRequest=new Request('http://academy.test/api/validation/media',{method:'POST',body:validationForm});
+const validationUpload=await mf.dispatchFetch(uploadRequest.url,{method:'POST',headers:{Origin:pagesOrigin,Authorization:'Bearer '+paToken,'Content-Type':uploadRequest.headers.get('Content-Type')},body:await uploadRequest.arrayBuffer()});assert.equal(validationUpload.status,200,await validationUpload.clone().text());assert.equal(validationUpload.headers.get('Access-Control-Allow-Origin'),pagesOrigin);const vm=await validationUpload.json();count++;
+const sharedFile=await mf.dispatchFetch('http://academy.test/api/validation/media/'+vm.id);assert.equal(sharedFile.status,200);assert.equal((await sharedFile.arrayBuffer()).byteLength,bytes.length);count++;
+const bucket=await mf.getR2Bucket('BUCKET');assert(await bucket.get('validation/'+vm.id));assert.equal(await bucket.get(vm.id),null);assert(await bucket.get(media.id));count++;
+const cannotReadOriginal=await mf.dispatchFetch('http://academy.test/api/validation/media/'+media.id);assert.equal(cannotReadOriginal.status,404);count++;
+const cannotReadTest=await mf.dispatchFetch('http://academy.test/api/media/'+vm.id,{headers:adminHeaders});assert.equal(cannotReadTest.status,404);count++;
+await validation(null,paToken,'/api/validation/academy?course='+c.id,503); // production-only ID never becomes visible here
+await validation({action:'transition',id:c.id,status:'arquivado',comment:'Must stay isolated'},paToken,'/api/validation/academy',400);
+await validation(null,paToken,'/api/validation/certificate/'+cert.id,404);
+await pages(null,paToken,'/api/certificate/'+vc.id,404);
+const stillShared=await (await validation(null,pbToken)).json();assert.equal(stillShared.enrollments[0].done,3);assert.equal(stillShared.enrollments[0].best,100);assert.equal(stillShared.certificates[0].status,'revogado');assert.equal(stillShared.cohorts.length,1);assert.equal(stillShared.media[0].id,vm.id);assert(stillShared.audit.length>0);
+// Interleave shared-test and original requests with identical primary keys.
+await Promise.all(Array.from({length:12},async(_,i)=>{
+ const route=i%2?'/api/validation/academy?course=orientacao':'/api/academy?course=orientacao';
+ const response=await mf.dispatchFetch('http://academy.test'+route,{headers:{Origin:pagesOrigin,Authorization:'Bearer '+(i%3?paToken:pbToken)}});
+ assert.equal(response.status,200);const d=await response.json();assert.equal(d.course.title,i%2?'Percurso de teste da Academia':'Introdução à Academia Digital');count++;
+}));
+for(const route of ['/api/validation/academy','/api/validation/media','/api/validation/certificate/'+vc.id]){
+ const cors=await mf.dispatchFetch('http://academy.test'+route,{method:'OPTIONS',headers:{Origin:pagesOrigin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization,content-type'}});assert.equal(cors.status,204);count++;
+ const denied=await mf.dispatchFetch('http://academy.test'+route,{method:route.includes('/certificate/')?'GET':'POST',headers:{Origin:'https://outside.test','Content-Type':'application/json'},...(route.includes('/certificate/')?{}:{body:JSON.stringify({action:'seed'})})});assert.equal(denied.status,403);count++;
+}
+// An ordinary browser can use the validation entry without any identity headers.
+const noIdentity=await mf.dispatchFetch('http://academy.test/api/validation/academy');assert.equal(noIdentity.status,200);assert.equal((await noIdentity.json()).validation,true);count++;
+await guest({action:'seed'},'','/api/academy',403,{'X-Academy-Validation':'1'});
+assert.equal(await originalRecords(),beforeValidation,'Every original record must remain byte-for-byte identical');count++;
+
+console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR','Pages CORS/preflight','Pages learning and PDF','bearer session isolation','cookie continuity','cross-origin administration denied','shared administrative validation without accounts','same business rules in isolated tables','cross-device shared test records','validation PDF, verification and revocation','test upload isolation','concurrent request isolation','original records unchanged']},null,2));
 }finally{await mf.dispose();}

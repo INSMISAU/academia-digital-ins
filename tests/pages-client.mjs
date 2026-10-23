@@ -11,18 +11,18 @@ const store = new Map();
 const localStorage = {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value)};
 let clock = Date.now();
 const requests = [];
-function client(origin, storage = localStorage) {
+function client(origin, storage = localStorage, search = '') {
   const context = {exports: {}, __ACADEMY_API_ORIGIN__: origin, Headers, crypto: webcrypto,
-    Date: {now: () => clock}, localStorage: storage,
+    Date: {now: () => clock}, localStorage: storage, location: {search}, URLSearchParams,
     fetch: (url, init) => { requests.push({url, init}); return Promise.resolve(new Response('{}')); },
   };
   vm.runInNewContext(code, context);
   return context.exports;
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
-assert.equal(client(origin).academyAdministrationUrl(false),origin+'/signin-with-chatgpt?return_to=%2F%23gestao');
-assert.equal(client('').academyAdministrationUrl(false),'/signin-with-chatgpt?return_to=%2F%23gestao');
-assert.equal(client('').academyAdministrationUrl(true),'#gestao');
+assert.equal(client(origin).academyAdministrationUrl(false),'?validacao=1#gestao');
+assert.equal(client('').academyAdministrationUrl(false),'?validacao=1#gestao');
+assert.equal(client('').academyAdministrationUrl(true),'?validacao=1#gestao');
 assert.equal(client(origin).academyPublicUrl,'https://insmisau.github.io/academia-digital-ins/');
 const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
 await client(origin).academyFetch('/api/academy');
@@ -48,6 +48,13 @@ await client('').academyFetch('/api/academy');
 assert.equal(requests.at(-1).url, '/api/academy');
 assert.equal(requests.at(-1).init.credentials, 'same-origin');
 assert.equal(requests.at(-1).init.headers.has('Authorization'), false, 'The existing Site retains cookie sessions');
+const testClient=client(origin,localStorage,'?validacao=1');
+assert.equal(testClient.academyValidation(),true);
+await testClient.academyFetch('/api/academy?course=orientacao');
+assert.equal(requests.at(-1).url,origin+'/api/validation/academy?course=orientacao');
+assert.equal(testClient.academyUrl('/api/media/test-file'),origin+'/api/validation/media/test-file');
+assert.equal(testClient.academyUrl('/verify/TEST'),origin+'/validation/verify/TEST');
+assert.equal(client(origin).academyUrl('/api/media/test-file'),origin+'/api/media/test-file');
 const html = readFileSync('index.html', 'utf8');
 assert.match(html, /lang="pt-MZ"/);
 for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
