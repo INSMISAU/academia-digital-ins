@@ -24,7 +24,7 @@ await api({action:'complete',enrollmentId:e.id,lessonId:'L1'});
 const state=await api();assert.equal(state.enrollments[0].done,3);assert.equal(state.enrollments[0].attempts.length,1);assert.equal(state.enrollments[0].best,100);assert.equal(state.enrollments[0].eligible,true);
 const cert=await api({action:'certificate',enrollmentId:e.id});const cert2=await api({action:'certificate',enrollmentId:e.id});assert.equal(cert.id,cert2.id);
 const pdf=await mf.dispatchFetch('http://academy.test/api/certificate/'+cert.id,{headers:adminHeaders});assert.equal(pdf.status,200);const bytes=new Uint8Array(await pdf.arrayBuffer());assert(new TextDecoder().decode(bytes.slice(0,4))==='%PDF');fs.writeFileSync(path.join(os.tmpdir(),'academy-test-certificate.pdf'),bytes);count++;
-const verify=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert.equal(verify.status,200);assert((await verify.text()).includes('Registo de demonstração válido'));count++;
+const verify=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert.equal(verify.status,200);assert((await verify.text()).includes('Registo de conclusão válido'));count++;
 await api({action:'revoke',id:cert.id,reason:'Teste de revogação'});
 const revoked=await mf.dispatchFetch('http://academy.test/verify/'+cert.code);assert((await revoked.text()).includes('Certificado revogado'));count++;
 const c=await api({action:'course',title:'Curso de teste editorial',summary:'Objectivo de teste',category:'Formação',hours:2,pass:80});
@@ -166,5 +166,33 @@ const noIdentity=await mf.dispatchFetch('http://academy.test/api/validation/acad
 await guest({action:'seed'},'','/api/academy',403,{'X-Academy-Validation':'1'});
 assert.equal(await originalRecords(),beforeValidation,'Every original record must remain byte-for-byte identical');count++;
 
-console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR','Pages CORS/preflight','Pages learning and PDF','bearer session isolation','cookie continuity','cross-origin administration denied','shared administrative validation without accounts','same business rules in isolated tables','cross-device shared test records','validation PDF, verification and revocation','test upload isolation','concurrent request isolation','original records unchanged']},null,2));
+// The actual administration shares the public Academy catalogue, without an account wall.
+async function administration(body=null,token=paToken,route='/api/administration/academy',expected=200){return pages(body,token,route,expected);}
+const liveAdmin=await (await administration()).json();assert.equal(liveAdmin.isAdmin,true);assert.equal(liveAdmin.validation,false);assert(liveAdmin.courses.some(x=>x.id===c.id));
+const managed=await (await administration({action:'course',title:'Curso QA da Academia',summary:richSummary,category:'Verificação local',hours:0,pass:80})).json();
+await administration({action:'lesson',courseId:managed.id,module:'Módulo QA',title:'Aula QA',body:richBody},pbToken);
+await administration({action:'question',courseId:managed.id,prompt:'Escolha a opção correcta',options:['Opção A','Opção B'],answer:0,explanation:'Resposta correcta: A.'});
+for(const status of ['em_revisao','aprovado','publicado'])await administration({action:'transition',id:managed.id,status,comment:'Revisão da equipa'},pbToken);
+const catalogueAfterPublication=await (await pages()).json();assert(catalogueAfterPublication.courses.some(x=>x.id===managed.id),'Published course must appear in the actual public catalogue');
+const anotherAdmin=await (await administration(null,pbToken)).json();assert(anotherAdmin.courses.some(x=>x.id===managed.id));
+const registration=await (await administration({action:'enroll',courseId:managed.id,participant:'Participante QA',province:'Maputo Cidade'})).json();
+const managedDetail=await (await administration(null,pbToken,'/api/administration/academy?course='+managed.id)).json();
+await administration({action:'complete',enrollmentId:registration.id,lessonId:managedDetail.lessons[0].id},pbToken);
+await administration({action:'submit',enrollmentId:registration.id,answers:{[managedDetail.questions[0].id]:0},requestId:'administration-qa-attempt'},pbToken);
+const actualCertificate=await (await administration({action:'certificate',enrollmentId:registration.id})).json();assert(actualCertificate.code.startsWith('ACAD-'));
+const actualPdf=await administration(null,pbToken,'/api/administration/certificate/'+actualCertificate.id);assert((await actualPdf.text()).startsWith('%PDF'));
+const actualVerification=await mf.dispatchFetch('http://academy.test/verify/'+actualCertificate.code);const actualVerificationText=await actualVerification.text();assert(actualVerificationText.includes('Registo de conclusão válido'));assert(!actualVerificationText.includes('demonstração'));count++;
+await administration({action:'revoke',id:actualCertificate.id,reason:'Verificação local'},pbToken);
+const actualForm=new FormData();actualForm.append('file',new File([bytes],'material-qa.pdf',{type:'application/pdf'}));const actualRequest=new Request('http://academy.test/api/administration/media',{method:'POST',body:actualForm});
+const actualUpload=await mf.dispatchFetch(actualRequest.url,{method:'POST',headers:{Origin:pagesOrigin,Authorization:'Bearer '+pbToken,'Content-Type':actualRequest.headers.get('Content-Type')},body:await actualRequest.arrayBuffer()});assert.equal(actualUpload.status,200);assert.equal(actualUpload.headers.get('Access-Control-Allow-Origin'),pagesOrigin);const actualFile=await actualUpload.json();count++;
+const actualDownload=await mf.dispatchFetch('http://academy.test/api/administration/media/'+actualFile.id);assert.equal(actualDownload.status,200);assert.equal((await actualDownload.arrayBuffer()).byteLength,bytes.length);count++;
+assert(await bucket.get(actualFile.id));assert.equal(await bucket.get('validation/'+actualFile.id),null);count++;
+for(const route of ['/api/administration/academy','/api/administration/media','/api/administration/certificate/'+actualCertificate.id]){
+ const preflight=await mf.dispatchFetch('http://academy.test'+route,{method:'OPTIONS',headers:{Origin:pagesOrigin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization,content-type'}});assert.equal(preflight.status,204);count++;
+}
+const mainStillPublic=await (await pages()).json();assert.equal(mainStillPublic.isAdmin,false);assert.equal(mainStillPublic.audit.length,0);assert.equal(mainStillPublic.media.length,0);
+const noAccount=await mf.dispatchFetch('http://academy.test/api/administration/academy');assert.equal(noAccount.status,200);assert.equal((await noAccount.json()).isAdmin,true);count++;
+const invalidOrigin=await mf.dispatchFetch('http://academy.test/api/administration/academy',{method:'POST',headers:{Origin:'https://outside.test','Content-Type':'application/json'},body:JSON.stringify({action:'course'})});assert.equal(invalidOrigin.status,403);count++;
+
+console.log(JSON.stringify({passed:count,checks:['seed','no answer keys','completion gate','idempotency','server grading','certificate PDF and QR','verification','revocation','editorial workflow','published immutability','version copy','cohorts','upload/download','SSR','Pages CORS/preflight','Pages learning and PDF','bearer session isolation','cookie continuity','cross-origin administration denied','shared administrative validation without accounts','same business rules in isolated tables','cross-device shared test records','validation PDF, verification and revocation','test upload isolation','concurrent request isolation','original records unchanged in legacy validation','actual administration without accounts','publication visible in actual catalogue','actual course, enrollment, certificate and materials']},null,2));
 }finally{await mf.dispose();}

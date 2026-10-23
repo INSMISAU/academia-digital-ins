@@ -358,5 +358,3 @@ body{font-family:Arial,Helvetica,sans-serif;color:#19333f;font-size:16px;backgro
 .academy-footer-actions {display:flex;align-items:center;flex-wrap:wrap;gap:10px 22px;}
 .academy-footer-actions a {display:inline-flex;align-items:center;min-height:32px;}
 @media(max-width:600px){.institutional-header nav .academy-admin-entry {padding:7px 9px;}.academy-footer-actions {gap:8px 18px;}}
-
-.academy-validation-banner{display:flex;gap:12px;align-items:flex-start;background:#fff8e7;border:1px solid #dbc68c;border-left:4px solid #997524;border-radius:10px;padding:16px 18px;margin-bottom:24px;color:#4b3a16}.academy-validation-banner>svg{flex-shrink:0;margin-top:2px}.academy-validation-banner strong{display:block;font-size:15px}.academy-validation-banner p{font-size:14px;line-height:1.6;margin:4px 0 0}

@@ -1,6 +1,7 @@
 // Only the Pages build supplies this constant. The existing Site stays same-origin.
 declare const __ACADEMY_API_ORIGIN__: string;
 export const academyOrigin = typeof __ACADEMY_API_ORIGIN__ === 'string' ? __ACADEMY_API_ORIGIN__ : '';
+// Keep the existing storage key to preserve visitor progress.
 const storageKey = 'ins-academia-demo-session-v1';
 const lifetime = 30 * 24 * 60 * 60 * 1000;
 type Session = {token: string; expires: number};
@@ -29,23 +30,22 @@ function sessionToken() {
   return session.token;
 }
 
-export function academyValidation() {
-  return typeof location !== 'undefined' && new URLSearchParams(location.search).get('validacao') === '1';
+export function academyAdministration() {
+  return typeof location !== 'undefined' && ['administracao','validacao'].some(key=>new URLSearchParams(location.search).get(key)==='1');
 }
 export function academyUrl(path: string) {
-  if (academyValidation()) {
-    if (path.startsWith('/api/')) path = '/api/validation/' + path.slice(5);
-    else if (path.startsWith('/verify/')) path = '/validation' + path;
+  if (academyAdministration()) {
+    if (path.startsWith('/api/')) path = '/api/administration/' + path.slice(5);
   }
   return academyOrigin + path;
 }
 
 export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins/';
 
-// Validation stays on the Academy entry point. It has its own server records;
-// this flag never changes authorization on the original administration API.
+// The administrative view stays in the Academy and uses its own existing
+// catalogue records. Account and role configuration is the final project stage.
 export function academyAdministrationUrl(_isAdmin?: boolean) {
-  return '?validacao=1#gestao';
+  return '?administracao=1#gestao';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {
@@ -68,3 +68,6 @@ export async function downloadCertificate(id: string, code: string) {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+// Compatibility for links already shared before the administrative correction.
+export const academyValidation = academyAdministration;

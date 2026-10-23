@@ -9,7 +9,7 @@ export async function withPagesCors(req: Request, handle: () => Promise<Response
   const origin = req.headers.get('Origin');
   if (origin && !permittedOrigin(req)) return Response.json({error: 'Origem não autorizada.'}, {status: 403});
   if (origin === pagesOrigin && !/^Bearer [a-f0-9]{64}$/.test(req.headers.get('Authorization') || '')) {
-    return corsHeaders(Response.json({error: 'Não foi possível recuperar esta sessão de teste. Recarregue a página.'}, {status: 401}));
+    return corsHeaders(Response.json({error: 'Não foi possível recuperar a sessão. Recarregue a página.'}, {status: 401}));
   }
   const response = await handle();
   return origin === pagesOrigin ? corsHeaders(response) : response;
