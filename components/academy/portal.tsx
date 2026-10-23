@@ -56,9 +56,23 @@ export function AcademyAbout({onNavigate}: {onNavigate: (id: string) => void}) {
   return <><div className="page-heading"><div><h1>Sobre a Academia</h1></div></div><section className="panel academy-about"><p>A Academia Digital do Instituto Nacional de Saúde reúne o acesso à formação em saúde e aos conteúdos dos cursos.</p><Button onClick={() => onNavigate('catalogo')}>Consultar cursos<ArrowRight size={16}/></Button></section></>;
 }
 
-function EbookResource() {
-  return <article className="academy-resource"><BookOpen size={28} aria-hidden="true"/><div><h2>Manual de Detecção e Investigação de Surtos</h2><p>eBook · Material de consulta</p><a className="button-link" href="https://insmisau.github.io/manual-surtos/">Consultar eBook<ArrowRight size={16}/></a></div></article>;
+export const academyEbook = {
+  title: 'Manual de Detecção e Investigação de Surtos',
+  description: 'eBook · Material de consulta',
+  url: 'https://insmisau.github.io/manual-surtos/',
+};
+
+export function EbookResource() {
+  return <article className="academy-course-card academy-ebook-card">
+    <div className="academy-course-top external-course"><span className="academy-category">Biblioteca</span><BookOpen size={25} strokeWidth={1.5} aria-hidden="true"/></div>
+    <div className="academy-course-content">
+      <div className="academy-course-type">eBook</div>
+      <h3>{academyEbook.title}</h3>
+      <p>Material de consulta</p>
+      <div className="academy-course-actions"><a className="button-link" href={academyEbook.url}>Consultar eBook<ArrowRight size={15}/></a></div>
+    </div>
+  </article>;
 }
 export function AcademyLibrary() {
-  return <><div className="page-heading"><div><h1>Biblioteca</h1><p>Manuais e materiais de apoio à formação.</p></div></div><EbookResource/></>;
+  return <div className="page-heading"><div><h1>Biblioteca</h1><p>Manuais e materiais de apoio à formação.</p></div></div>;
 }

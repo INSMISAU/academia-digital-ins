@@ -57,6 +57,37 @@ export function academyFetch(path: string, init: RequestInit = {}) {
   });
 }
 
+// Bound read requests, including the response body. Writes keep their existing
+// behaviour and are never retried automatically.
+export async function academyReadJson(path: string, timeoutMs = 20_000) {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error('O servidor demorou a responder. Tente novamente.'));
+      controller.abort();
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      (async () => {
+        const response = await academyFetch(path, {cache: 'no-store', signal: controller.signal});
+        let data: any;
+        try { data = await response.json(); }
+        catch { throw new Error('Não foi possível ler a resposta do servidor. Tente novamente.'); }
+        if (!response.ok) throw new Error(data?.error || 'Não foi possível carregar os dados. Tente novamente.');
+        return data;
+      })(),
+      timeout,
+    ]);
+  } catch (error) {
+    if (error instanceof TypeError) throw new Error('Não foi possível ligar ao servidor. Verifique a ligação e tente novamente.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function downloadCertificate(id: string, code: string) {
   const response = await academyFetch('/api/certificate/' + encodeURIComponent(id), {cache: 'no-store'});
   if (!response.ok) throw Error('Não foi possível descarregar o certificado. Tente novamente.');

@@ -373,3 +373,60 @@ body{font-family:Arial,Helvetica,sans-serif;color:#19333f;font-size:16px;backgro
 @media(max-width:820px){.institutional-shell.is-management{display:block}.is-management>.institutional-management{position:static;max-height:none;margin:16px;display:flex;flex-direction:row;flex-wrap:wrap;gap:5px}.is-management>.institutional-management button,.is-management>.institutional-management a{padding:9px 11px}.institutional-header nav{gap:10px 15px}.workspace-filter{flex-direction:column;align-items:stretch}.workspace-filter>.field{min-width:0}.report-filters{grid-template-columns:1fr 1fr}.builder-module header,.assessment-choice,.assessment-history{align-items:flex-start;flex-direction:column}.builder-tabs{gap:6px}.builder-tabs button{padding:9px 11px;font-size:13px}.content-pdf{height:350px}}
 @media(max-width:500px){.report-filters,.admin-shortcuts{grid-template-columns:1fr}.workspace-columns{gap:16px}.workspace-records{gap:16px}.workspace-record{padding:20px}.report-filters{padding:18px}.assessment-bank header{align-items:start;flex-direction:column}.report-bar{grid-template-columns:100px 1fr 24px;gap:9px}.builder-module{padding:16px}}
 @media print{.institutional-header,.institutional-management,.workspace-filter,.report-filters,.page-heading>div:last-child:not(:first-child),.page-footer,.builder-tabs{display:none!important}.institutional-shell.is-management{display:block}.workspace-table{overflow:visible}.workspace-table table{font-size:10px}.workspace-table th,.workspace-table td{padding:7px;min-width:0}.workspace-columns{grid-template-columns:1fr}.metrics{break-inside:avoid}.panel{break-inside:avoid}}
+
+/* Shared card finish. Preserve the institutional colours and page structure. */
+.institutional-shell {
+  --academy-card-border: #cbdde1;
+  --academy-card-shadow: -7px 0 20px rgba(28, 69, 81, .055), 7px 0 20px rgba(28, 69, 81, .055), 0 7px 16px rgba(28, 69, 81, .05);
+  --academy-card-shadow-hover: -9px 0 24px rgba(28, 69, 81, .08), 9px 0 24px rgba(28, 69, 81, .08), 0 10px 22px rgba(28, 69, 81, .07);
+}
+.institutional-main :is(.academy-course-card, .panel, .metric, .academy-category-card, .academy-resume, .admin-shortcuts>button, .workspace-announcements>article, .assessment-choice, .assessment-history) {
+  border-color: var(--academy-card-border);
+  border-radius: 14px;
+  box-shadow: var(--academy-card-shadow);
+}
+.institutional-main :is(.academy-course-card, .academy-category-card, .admin-shortcuts>button, .material) {
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.institutional-main :is(.academy-course-card, .academy-category-card, .admin-shortcuts>button, .material):is(:hover, :focus-within) {
+  border-color: #8eb5be;
+  box-shadow: var(--academy-card-shadow-hover);
+}
+.institutional-main :is(.course-grid, .workspace-records, .materials-grid, .enrollment-grid) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+  align-items: stretch;
+}
+.institutional-main .academy-course-card {max-width: none; width: 100%;}
+.academy-home-section>.academy-ebook-card {flex: 1;}
+.academy-course-top {min-height: 70px; padding: 20px 24px; border-bottom: 1px solid #d8e5e8;}
+.academy-course-top.external-course, .academy-record-card .academy-course-top {background: #e5eff0; color: #315c69;}
+.academy-course-content {padding: 24px; min-width: 0;}
+.academy-course-type {font-size: 12px; line-height: 1.5; flex-wrap: wrap;}
+.academy-course-content h3 {font-size: 21px; line-height: 1.4; margin: 12px 0;}
+.academy-course-content>p {font-size: 14px; line-height: 1.7; margin: 0 0 20px; overflow-wrap: anywhere;}
+.academy-course-actions {padding-top: 18px; gap: 10px; align-items: center;}
+.academy-course-actions :is(.button-link, button) {min-height: 42px; padding: 10px 16px; font-size: 14px; line-height: 1.4; gap: 9px;}
+.academy-course-actions svg {flex-shrink: 0;}
+.academy-record-card .record-image {display: block; width: 100%; height: 180px; object-fit: cover;}
+.academy-record-card .academy-course-content>.meta {font-size: 13px; margin: 0 0 12px;}
+.workspace-record {padding: 24px;}
+.workspace-record h2 {font-size: 21px; line-height: 1.4;}
+.workspace-record>.row {padding-top: 16px; border-top: 1px solid #e7edef; align-self: stretch;}
+.academy-loading {max-width: 780px; margin: 32px auto;}
+.academy-loading p {max-width: 500px; margin: 10px auto 18px;}
+@media(max-width:820px) {
+  .institutional-main :is(.course-grid, .workspace-records, .materials-grid, .enrollment-grid) {grid-template-columns: minmax(0, 1fr); gap: 22px;}
+}
+@media(max-width:600px) {
+  .academy-course-top {padding: 18px 20px; min-height: 64px;}
+  .academy-course-content, .workspace-record {padding: 20px;}
+  .academy-course-content h3 {font-size: 20px;}
+  .academy-course-actions :is(.button-link, button) {max-width: 100%; white-space: normal; text-align: left;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .institutional-main :is(.academy-course-card, .academy-category-card, .admin-shortcuts>button, .material) {transition: none;}
+}
+@media print {
+  .institutional-main :is(.academy-course-card, .panel, .metric, .academy-category-card, .academy-resume, .admin-shortcuts>button, .workspace-announcements>article, .assessment-choice, .assessment-history) {box-shadow: none;}
+}

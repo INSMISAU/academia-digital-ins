@@ -1,5 +1,6 @@
 'use client';
 import {useState} from 'react';
+import {academyEbook,EbookResource} from '@/components/academy/portal';
 import {Plus,ArrowRight,BookOpen,Calendar,Users,FileText,BarChart3,Settings2,Search,Download,Save,History,ExternalLink} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -51,11 +52,19 @@ export function RecordsPanel({kind,work,data,request,reload}:Props&{kind:EntryKi
  </>;
 }
 
-export function PublicRecords({kind,work,courses,onOpen,embedded}:{kind:EntryKind;work:Workspace;courses:any[];onOpen:(c:any)=>void;embedded?:boolean}){
+export function PublicRecords({kind,work,courses,onOpen,embedded,includeEbook=false}:{kind:EntryKind;work:Workspace;courses:any[];onOpen:(c:any)=>void;embedded?:boolean;includeEbook?:boolean}){
  const [search,setSearch]=useState(''),[category,setCategory]=useState(''),[detail,setDetail]=useState<Entry|null>(null);
  const list=entriesOf(work,kind).filter(published),items=list.filter(e=>(!category||e.body.category===category)&&normalise([e.title,e.body.description,e.body.category,e.body.tags].join(' ')).includes(normalise(search)));
+ const showEbook=includeEbook&&kind==='recurso'&&!category&&normalise(academyEbook.title+' '+academyEbook.description).includes(normalise(search));
+ const RecordIcon=kind==='formador'?Users:kind==='evento'?Calendar:kind==='recurso'?BookOpen:FileText;
  return <>{!embedded&&<Heading title={labels[kind]||kindNames[kind]}/>}<div className="workspace-filter"><F label="Pesquisar"><Input type="search" value={search} onChange={e=>setSearch(e.target.value)}/></F><F label="Categoria"><select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Todas as categorias</option>{[...new Set(list.map(e=>e.body.category).filter(Boolean))].map(c=><option key={c}>{c}</option>)}</select></F></div>
- <div className="workspace-records">{items.map(e=><article className="panel workspace-record" key={e.id}>{e.body.imageUrl&&<img className="record-image" src={e.body.imageUrl} alt={e.title} loading="lazy"/>}<span className="meta">{e.body.category||e.body.specialty||e.body.type}</span><h2>{e.title}</h2>{kind==='evento'&&<p className="meta">{date(e.body.date)}{e.body.ends?' a '+date(e.body.ends):''} · {e.body.location}</p>}{kind==='formador'&&<p className="meta">{e.body.institution}</p>}<p>{e.body.description?.slice(0,220)}</p>{kind==='recurso'?<a className="button-link" href={resourceUrl(e)} target="_blank" rel="noreferrer">Consultar material<ExternalLink size={16}/></a>:<Button variant="outline" onClick={()=>setDetail(e)}>Consultar<ArrowRight size={16}/></Button>}</article>)}</div>{!items.length&&<NoRecords>Ainda não existem registos publicados neste filtro.</NoRecords>}
+ <div className="workspace-records">{showEbook&&<EbookResource/>}{items.map(e=><article className="academy-course-card academy-record-card" key={e.id}>
+  <div className="academy-course-top"><span className="academy-category">{e.body.category||e.body.specialty||e.body.type||kindNames[kind]}</span><RecordIcon size={25} strokeWidth={1.5} aria-hidden="true"/></div>
+  {e.body.imageUrl&&<img className="record-image" src={e.body.imageUrl} alt={e.title} loading="lazy"/>}
+  <div className="academy-course-content"><h3>{e.title}</h3>{kind==='evento'&&<p className="meta">{date(e.body.date)}{e.body.ends?' a '+date(e.body.ends):''} · {e.body.location}</p>}{kind==='formador'&&<p className="meta">{e.body.institution}</p>}<p>{e.body.description?.slice(0,220)}</p>
+   <div className="academy-course-actions">{kind==='recurso'?<a className="button-link" href={resourceUrl(e)} target="_blank" rel="noreferrer">Consultar material<ExternalLink size={16}/></a>:<Button variant="outline" onClick={()=>setDetail(e)}>Consultar<ArrowRight size={16}/></Button>}</div>
+  </div>
+ </article>)}</div>{!items.length&&!showEbook&&<NoRecords>{includeEbook?'Nenhum material corresponde à pesquisa ou à categoria seleccionada.':'Ainda não existem registos publicados neste filtro.'}</NoRecords>}
  <Dialog open={!!detail} onOpenChange={v=>!v&&setDetail(null)}><DialogContent className="dialog-wide"><DialogHeader><DialogTitle>{detail?.title}</DialogTitle><DialogDescription>{detail?.body.category||detail?.body.institution||kindNames[kind]}</DialogDescription></DialogHeader>{detail&&<><div className="workspace-prose">{detail.body.description?.split(/\n\s*\n/).map((p:string,i:number)=><p key={i}>{p}</p>)}</div>{kind==='evento'&&<p>{date(detail.body.date)} · {detail.body.location} {detail.body.url&&<a className="button-link" href={detail.body.url} target="_blank" rel="noreferrer">Participar / consultar<ExternalLink size={15}/></a>}</p>}{kind==='programa'&&<section><h3>Cursos do programa</h3>{courses.filter(c=>c.status==='publicado'&&courseSetup(work,c.id).programId===detail.id).map(c=><button className="programme-course" key={c.id} onClick={()=>{setDetail(null);onOpen(c);}}>{c.title}<ArrowRight size={16}/></button>)}{!courses.some(c=>c.status==='publicado'&&courseSetup(work,c.id).programId===detail.id)&&<p>Ainda não existem cursos publicados neste programa.</p>}</section>}</>}</DialogContent></Dialog>
  </>;
 }
