@@ -21,8 +21,14 @@ function client(origin, storage = localStorage, search = '') {
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
 assert.equal(client(origin).academyAdministrationUrl(false),'?administracao=1#gestao');
-assert.equal(client('').academyAdministrationUrl(false),'?administracao=1#gestao');
-assert.equal(client('').academyAdministrationUrl(true),'?administracao=1#gestao');
+assert.equal(client('').academyAdministrationUrl(false),'https://insmisau.github.io/academia-digital-ins/?administracao=1#gestao');
+assert.equal(client('').academyAdministrationUrl(true),'https://insmisau.github.io/academia-digital-ins/?administracao=1#gestao');
+// Prevent the hosted button from reintroducing the ChatGPT sign-in flow.
+const hostedAdministration = new URL(client('').academyAdministrationUrl(false));
+assert.equal(hostedAdministration.origin, 'https://insmisau.github.io');
+assert.equal(hostedAdministration.searchParams.get('administracao'), '1');
+assert.equal(hostedAdministration.hash, '#gestao');
+assert(!/signin|chatgpt\.site/.test(hostedAdministration.href));
 assert.equal(client(origin).academyPublicUrl,'https://insmisau.github.io/academia-digital-ins/');
 const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
 await client(origin).academyFetch('/api/academy');

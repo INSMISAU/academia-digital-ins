@@ -42,10 +42,11 @@ export function academyUrl(path: string) {
 
 export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins/';
 
-// The administrative view stays in the Academy and uses its own existing
-// catalogue records. Account and role configuration is the final project stage.
+// Pages is the canonical public administration entry. The hosted service
+// must leave its own origin when entering administration, so validation does
+// not depend on a ChatGPT session. Accounts and roles remain the final stage.
 export function academyAdministrationUrl(_isAdmin?: boolean) {
-  return '?administracao=1#gestao';
+  return academyOrigin ? '?administracao=1#gestao' : academyPublicUrl + '?administracao=1#gestao';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {
