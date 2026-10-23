@@ -1,7 +1,7 @@
 import {courseOverview} from './academy-content';
 export type CatalogueFilters = {search: string; category: string; mode: string; order: string};
 export const defaultCatalogue: CatalogueFilters = {search: '', category: 'todas', mode: 'todos', order: 'recentes'};
-export const publicViews = ['inicio', 'catalogo', 'categorias', 'biblioteca', 'aprender', 'certificados', 'sobre'];
+export const publicViews = ['inicio', 'catalogo', 'categorias', 'biblioteca', 'aprender', 'certificados', 'sobre', 'programas', 'formadores', 'noticias', 'eventos'];
 export const normaliseSearch = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt').trim();
 
 export function courseCategories(courses: any[]) {

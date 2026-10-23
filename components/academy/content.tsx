@@ -1,5 +1,6 @@
 'use client';
 import {BookOpen, ExternalLink, FileText} from 'lucide-react';
+import {courseSetup,courseModules,type Workspace} from '@/lib/academy-workspace';
 import {courseOverview, lessonContent, safeResourceUrl, videoEmbed, blockLabels, moduleGroups, lessonExcerpt} from '@/lib/academy-content';
 
 export function CourseOverview({summary}: {summary: string}) {
@@ -17,6 +18,8 @@ export function LessonContent({body}: {body: string}) {
   const content = lessonContent(body);
   return <div className={'academy-content align-' + content.align}>{content.blocks.map((b, index) => {
     if (b.type === 'text') return <div className="content-text" key={index}>{b.text.split(/\n\s*\n/).map((p, i) => <p key={i}>{p}</p>)}</div>;
+    if (b.type === 'richtext') return <div className="content-text" key={index}>{b.text.split(/\n\s*\n/).map((p,i)=><FormattedText key={i} text={p}/>)}</div>;
+    if (b.type === 'notice') return <aside className="content-note" key={index}><strong>{b.title||'Nota'}</strong>{b.text.split(/\n\s*\n/).map((p,i)=><p key={i}>{p}</p>)}</aside>;
     if (b.type === 'heading') return <h3 key={index}>{b.text}</h3>;
     if (b.type === 'list') return <ul key={index}>{b.text.split('\n').filter(s => s.trim()).map((s, i) => <li key={i}>{s}</li>)}</ul>;
     const url = safeResourceUrl(b.url), embed = b.type === 'video' ? videoEmbed(b.url) : null;
@@ -25,10 +28,15 @@ export function LessonContent({body}: {body: string}) {
     return <figure className={'content-resource resource-' + b.type} key={index}>
       {b.type === 'image' ? <img src={url} alt={b.alt} loading="lazy" referrerPolicy="no-referrer"/> :
         b.type === 'video' ? (embed ? <iframe src={embed} title={b.title} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allow="fullscreen; picture-in-picture" allowFullScreen/> : <video src={url} controls preload="none">Consulte a ligação ao vídeo abaixo.</video>) :
-        b.type === 'audio' ? <audio src={url} controls preload="none">Consulte a ligação ao áudio abaixo.</audio> : <FileText size={24} aria-hidden="true"/>}
+        b.type === 'audio' ? <audio src={url} controls preload="none">Consulte a ligação ao áudio abaixo.</audio> : b.type==='pdf'?<iframe className="content-pdf" src={url} title={b.title||'Documento PDF'} loading="lazy"/>:<FileText size={24} aria-hidden="true"/>}
       <figcaption>{link}{b.text && <p>{b.text}</p>}{b.source && <small>Fonte: {b.source}</small>}</figcaption>
     </figure>;
   })}</div>;
+}
+
+function FormattedText({text}:{text:string}){
+ const parts=text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+ return <p>{parts.map((p,i)=>p.startsWith('**')&&p.endsWith('**')?<strong key={i}>{p.slice(2,-2)}</strong>:p.startsWith('*')&&p.endsWith('*')?<em key={i}>{p.slice(1,-1)}</em>:p)}</p>;
 }
 
 export function CourseProgramme({lessons, editable, onEdit, onAdd}: {lessons: any[]; editable: boolean; onEdit: (lesson: any) => void; onAdd: (module: string) => void}) {
@@ -41,4 +49,9 @@ export function CourseProgramme({lessons, editable, onEdit, onAdd}: {lessons: an
     </section>)}
     {editable && <button type="button" className="button-link" onClick={() => onAdd(groups.at(-1)?.name || '')}>Adicionar aula</button>}
   </section>;
+}
+
+export function CourseNotes({work,courseId}:{work:Workspace;courseId:string}){
+ const setup=courseSetup(work,courseId),modules=courseModules(work,courseId);
+ return <>{(setup.starts||setup.ends)&&<p className="meta">Período de formação: {setup.starts||'por definir'} a {setup.ends||'por definir'}</p>}{setup.notes&&<section className="content-note"><h3>Notas e orientações</h3><p className="workspace-prose">{setup.notes}</p></section>}{modules.filter(m=>m.body.notes||m.body.objectives).map(m=><section className="programme-module" key={m.id}><h3>{m.title}</h3>{m.body.objectives&&<><strong>Objectivos</strong><p className="workspace-prose">{m.body.objectives}</p></>}{m.body.notes&&<><strong>Notas</strong><p className="workspace-prose">{m.body.notes}</p></>}</section>)}</>;
 }

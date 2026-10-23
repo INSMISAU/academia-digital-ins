@@ -6,7 +6,7 @@ const context = new AsyncLocalStorage<boolean>();
 export const inValidation = () => context.getStore() === true;
 export const runValidation = <T>(handle: () => T): T => context.run(true, handle);
 
-const tables = 'courses|lessons|questions|enrollments|progress|attempts|certificates|cohorts|media|audit|reviews|snapshots';
+const tables = 'academy_entries|academy_entry_history|academy_cohort_members|academy_attendance|academy_assessment_runs|courses|lessons|questions|enrollments|progress|attempts|certificates|cohorts|media|audit|reviews|snapshots';
 const tableReference = new RegExp('\\b(FROM|JOIN|INTO|UPDATE)\\s+(' + tables + ')\\b', 'gi');
 
 // SQL is application-owned, never visitor supplied. Rewrite table references,

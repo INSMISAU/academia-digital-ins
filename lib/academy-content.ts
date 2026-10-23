@@ -7,7 +7,7 @@ export type CourseOverview = {
   summary: string; objectives: string; audience: string; prerequisites: string; modality: string;
 };
 export const blockLabels = {
-  text: 'Texto', heading: 'Título de secção', list: 'Lista', image: 'Imagem',
+  text: 'Texto', richtext: 'Texto formatado', notice: 'Nota / orientação', heading: 'Título de secção', list: 'Lista', image: 'Imagem',
   video: 'Vídeo', audio: 'Áudio', pdf: 'PDF', presentation: 'Apresentação', document: 'Documento', link: 'Ligação',
 };
 export type BlockType = keyof typeof blockLabels;
@@ -31,7 +31,7 @@ export function encodeOverview(input: CourseOverview): string {
   if (!data.summary) throw Error('Preencha o resumo do curso.');
   if (data.modality && !modalities.includes(data.modality)) throw Error('Seleccione uma modalidade válida.');
   const encoded = Object.entries(data).some(([key, value]) => key !== 'summary' && value) ? COURSE_FORMAT + JSON.stringify(data) : data.summary;
-  if (encoded.length > 3000) throw Error('Reduza o texto da ficha: o conjunto dos campos deve caber em 3000 caracteres.');
+  if (encoded.length > 30000) throw Error('Reduza o texto da ficha: o conjunto dos campos deve caber em 30000 caracteres.');
   return encoded;
 }
 export function newBlock(type: BlockType, id: string): ContentBlock {
@@ -40,7 +40,7 @@ export function newBlock(type: BlockType, id: string): ContentBlock {
 export function lessonContent(raw: unknown): LessonContent {
   const original = string(raw), data = payload(original, LESSON_FORMAT);
   if (!data || !Array.isArray(data.blocks) || !data.blocks.every((b: any) => b && Object.hasOwn(blockLabels, b.type))) {
-    return {align: 'left', blocks: [{...newBlock('text', 'legacy-text'), text: original}]};
+    return {align: 'justify', blocks: [{...newBlock('text', 'legacy-text'), text: original}]};
   }
   return {align: data.align === 'justify' ? 'justify' : 'left', blocks: data.blocks.map((b: any, i: number) => ({
     id: string(b.id) || 'block-' + i, type: b.type,
@@ -54,7 +54,7 @@ export function safeResourceUrl(raw: unknown): string | null {
     if (u.protocol !== 'https:' || u.username || u.password) return null;
     // The existing media endpoint is reserved for administration. It is not
     // a public attachment URL and would fail for participants.
-    if (u.pathname.startsWith('/api/media/')) return null;
+    if (/^\/api\/(administration\/|validation\/)?media\//.test(u.pathname)) return null;
     return u.href;
   } catch { return null; }
 }
@@ -79,7 +79,7 @@ export function encodeLesson(input: LessonContent): string {
     if (!Object.hasOwn(blockLabels, b.type) || !b.id || ids.has(b.id)) throw Error('Identificação de bloco inválida.');
     ids.add(b.id);
     const clean = {...b, text: b.text.trim(), url: b.url.trim(), title: b.title.trim(), alt: b.alt.trim(), source: b.source.trim()};
-    if (['text', 'heading', 'list'].includes(b.type)) {
+    if (['text', 'richtext', 'notice', 'heading', 'list'].includes(b.type)) {
       if (!clean.text) throw Error('Preencha o texto do bloco ' + (i + 1) + '.');
     } else {
       if (!safeResourceUrl(clean.url)) throw Error('No bloco ' + (i + 1) + ', use uma ligação HTTPS pública, sem espaços.');

@@ -14,7 +14,7 @@ assert.equal(c.lessonContent(legacy).blocks[0].text, legacy);
 assert.equal(c.encodeOverview(c.courseOverview(legacy)), legacy, 'No forced conversion of legacy course descriptions');
 const overview = {summary: 'Resumo de teste', objectives: 'Primeiro objectivo\nSegundo objectivo', audience: 'Equipa de teste', prerequisites: '', modality: 'Online'};
 assert.equal(JSON.stringify(c.courseOverview(c.encodeOverview(overview))), JSON.stringify(overview));
-assert.throws(() => c.encodeOverview({...overview, summary: 'x'.repeat(3000)}), /3000/);
+assert.throws(() => c.encodeOverview({...overview, summary: 'x'.repeat(30000)}), /30000/);
 assert.throws(() => c.encodeOverview({...overview, modality: 'Inventada'}));
 const allTypes = Object.keys(c.blockLabels).map((type, i) => ({...c.newBlock(type, String(i)), text: 'Texto de teste', title: 'Material de teste', url: 'https://example.test/material', alt: 'Descrição de teste', source: 'Fonte de teste'}));
 const encoded = c.encodeLesson({align: 'justify', blocks: allTypes});
@@ -35,4 +35,4 @@ assert.equal(c.lessonContent(c.encodeLesson({align:'left', blocks:reordered})).b
 const groups = c.moduleGroups([{module:'A',id:1},{module:'A',id:2},{module:'B',id:3},{module:'A',id:4}]);
 assert.equal(groups.map(g=>g.lessons.map(l=>l.id).join(',')).join('|'), '1,2|3|4', 'Grouping must not silently reorder the established lesson sequence');
 assert.equal(c.lessonContent(c.LESSON_FORMAT+'{broken').blocks[0].text,c.LESSON_FORMAT+'{broken');
-console.log('Content: legacy text, versioned round trip, all 10 block types, safe links, video hosts, validation, ordering and module sequence passed.');
+console.log('Content: legacy text, versioned round trip, all 12 block types, safe links, video hosts, validation, ordering and module sequence passed.');
