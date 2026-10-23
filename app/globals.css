@@ -350,3 +350,11 @@ body{font-family:Arial,Helvetica,sans-serif;color:#19333f;font-size:16px;backgro
 @media(max-width:600px){.editor-block {padding:.65rem;}.editor-block>header {align-items:flex-start;}.editor-block>header strong {font-size:.8rem;}.editor-add>button {width:100%;}.programme-module header {padding:.75rem;}}
 
 .editor-fields {display:grid; gap:1rem; min-width:0; border:0; padding:0; margin:0;}
+
+/* Administrative entry through the Academy's main navigation. */
+.institutional-header nav .academy-admin-entry {display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid #b6cdd3;border-radius:6px;font-size:13px;font-weight:600;color:#315b68;}
+.institutional-header nav .academy-admin-entry:hover {background:#edf4f5;border-color:#487985;}
+.institutional-header nav .academy-admin-entry[aria-current=page] {background:#e6f0f2;border-color:#487985;}
+.academy-footer-actions {display:flex;align-items:center;flex-wrap:wrap;gap:10px 22px;}
+.academy-footer-actions a {display:inline-flex;align-items:center;min-height:32px;}
+@media(max-width:600px){.institutional-header nav .academy-admin-entry {padding:7px 9px;}.academy-footer-actions {gap:8px 18px;}}

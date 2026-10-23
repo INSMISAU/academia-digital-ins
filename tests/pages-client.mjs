@@ -20,6 +20,10 @@ function client(origin, storage = localStorage) {
   return context.exports;
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
+assert.equal(client(origin).academyAdministrationUrl(false),origin+'/signin-with-chatgpt?return_to=%2F%23gestao');
+assert.equal(client('').academyAdministrationUrl(false),'/signin-with-chatgpt?return_to=%2F%23gestao');
+assert.equal(client('').academyAdministrationUrl(true),'#gestao');
+assert.equal(client(origin).academyPublicUrl,'https://insmisau.github.io/academia-digital-ins/');
 const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
 await client(origin).academyFetch('/api/academy');
 const first = requests.at(-1);
@@ -51,4 +55,4 @@ for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
   readFileSync(match[1].replace('/academia-digital-ins/', ''));
 }
 assert(readdirSync('assets').some(name => name.endsWith('.js')));
-console.log('Pages client: sessions, reload, expiry, storage fallback, cookies and asset paths passed.');
+console.log('Pages client: sessions, reload, expiry, storage fallback, cookies, administrative entry, return path and asset paths passed.');

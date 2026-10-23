@@ -31,6 +31,14 @@ function sessionToken() {
 
 export function academyUrl(path: string) { return academyOrigin + path; }
 
+export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins/';
+
+// Use top-level navigation for the existing administrative sign-in. The return
+// path is fixed and relative to that service, never supplied by a visitor.
+export function academyAdministrationUrl(isAdmin: boolean) {
+  return isAdmin ? '#gestao' : academyUrl('/signin-with-chatgpt?return_to=' + encodeURIComponent('/#gestao'));
+}
+
 export function academyFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (academyOrigin) headers.set('Authorization', 'Bearer ' + sessionToken());
