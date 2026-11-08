@@ -1,0 +1,7 @@
+.ins-ficha[data-slot=dialog-content]{display:block;width:min(42rem,calc(100% - 2rem));max-width:42rem;max-height:88dvh;overflow:auto;padding:clamp(1.2rem,4vw,2rem);color:#193540;background:white}
+.ins-ficha h2{font-size:1.3rem;font-weight:650;margin:.7rem 0}.ins-ficha p,.ins-ficha small{margin:.45rem 0}.ins-ficha :focus-visible{outline:2px solid #007681;outline-offset:2px}
+.ins-step,.ins-ficha small{color:#425f66;font-size:.85rem}.ins-step{margin-top:1rem}.ins-notice{white-space:pre-line;padding:.7rem;background:#f0f6f6}
+.ins-field{margin:.85rem 0}.ins-field>label:not(.ins-check),.ins-field legend,.ins-resumo dt{display:block;font-weight:600}
+.ins-field input:not([type=checkbox]),.ins-field select{display:block;width:100%;margin:.25rem 0;padding:.5rem .65rem;border:1px solid #789298;border-radius:.35rem;background:#fff;color:#193540}
+.ins-check{display:flex;align-items:baseline;gap:.55rem;margin:.5rem 0}.ins-check input{accent-color:#00636d}.ins-actions{display:flex;flex-wrap:wrap;gap:.55rem;margin:.85rem 0}.ins-resumo>div{margin:.45rem 0}.ins-resumo dd{overflow-wrap:anywhere}.ins-error{color:#982a27}.ins-status{font-weight:600}.ins-ficha details{margin-top:1rem}.ins-ficha summary{cursor:pointer}
+@media print{body:has(.ins-ficha)>*:not([data-slot=dialog-content]){display:none!important}.ins-ficha[data-slot=dialog-content]{position:static!important;transform:none;max-height:none!important;max-width:none;width:100%;overflow:visible;box-shadow:none;border:none}.ins-ficha button,.ins-ficha .ins-actions{display:none}}
