@@ -12,7 +12,7 @@ export function AcademyMenu({items, view, navigate, reviewCount = 0}: {items: an
   return <SidebarMenu>{items.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view === item.id} onClick={() => {navigate(item.id); setOpenMobile(false);}}><item.icon/><span>{item.title}</span>{item.id === 'revisao' && reviewCount > 0 && <span className="nav-count">{reviewCount}</span>}</SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>;
 }
 
-export function PublicCourseCard({course, enrollment, onOpen, onContinue, management = false}: {course: any; enrollment?: any; onOpen: () => void; onContinue: () => void; management?: boolean}) {
+export function PublicCourseCard({course, enrollment, onOpen, onContinue, onRegister, management = false}: {course: any; enrollment?: any; onOpen: () => void; onContinue: () => void; onRegister?: () => void; management?: boolean}) {
   const labels: any = {rascunho: 'Rascunho', em_revisao: 'Em revisão', aprovado: 'Aprovado', publicado: 'Publicado', arquivado: 'Arquivado'};
   return <article className="academy-course-card">
     <div className={'academy-course-top ' + (course.external ? 'external-course' : 'internal-course')}>
@@ -24,7 +24,7 @@ export function PublicCourseCard({course, enrollment, onOpen, onContinue, manage
       <p>{course.external ? 'Conteúdos e avaliações do curso.' : courseOverview(course.summary).summary}</p>
       {!course.external && <div className="academy-course-facts"><span><Layers size={15}/>{course.lessons || 0} aulas</span><span>{course.questions || 0} questões</span></div>}
       {enrollment && <div className="academy-course-progress"><div><span>{enrollment.eligible ? 'Percurso concluído' : 'Aulas concluídas'}</span><strong>{lessonPercent(enrollment)}%</strong></div><Progress value={lessonPercent(enrollment)} aria-label="Percentagem de aulas concluídas"/></div>}
-      <div className="academy-course-actions"><>{course.external && !management ? <a className="button-link" href={course.external}>Aceder ao curso<ArrowRight size={15}/></a> : <Button variant="outline" onClick={enrollment && !management ? onContinue : onOpen}>{management ? 'Gerir curso' : enrollment ? 'Continuar' : 'Ver curso'}<ArrowRight size={15}/></Button>}</></div>
+      <div className="academy-course-actions"><>{course.external && !management ? <a className="button-link" href={course.external}>Aceder ao curso<ArrowRight size={15}/></a> : <Button variant="outline" onClick={enrollment && !management ? onContinue : onOpen}>{management ? 'Gerir curso' : enrollment ? 'Continuar' : 'Ver curso'}<ArrowRight size={15}/></Button>}{onRegister&&<Button variant="outline" onClick={onRegister}>Ficha de inscrição</Button>}</></div>
     </div>
   </article>;
 }

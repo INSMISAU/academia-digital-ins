@@ -1,0 +1,434 @@
+{
+  "fields": [
+    {
+      "key": "nome",
+      "section": 1,
+      "label": "Nome completo do participante",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "email",
+      "section": 1,
+      "label": "Endereço de email",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "certificado",
+      "section": 1,
+      "label": "Nome completo a constar no certificado",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "telefone",
+      "section": 1,
+      "label": "Telefone principal",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "alternativo",
+      "section": 1,
+      "label": "Contacto alternativo ou WhatsApp",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "sexo",
+      "section": 1,
+      "label": "Sexo",
+      "required": false,
+      "options": [
+        "Feminino",
+        "Masculino",
+        "Prefiro não responder"
+      ]
+    },
+    {
+      "key": "situacao",
+      "section": 2,
+      "label": "Situação actual",
+      "required": true,
+      "options": [
+        "Profissional em actividade",
+        "Estudante",
+        "Estagiário/a",
+        "Sem vínculo institucional",
+        "Auto emprego",
+        "Outra"
+      ]
+    },
+    {
+      "key": "sector",
+      "section": 2,
+      "label": "Sector da instituição",
+      "required": true,
+      "options": [
+        "Público",
+        "Privado",
+        "ONG / Sociedade civil",
+        "Ensino / Investigação",
+        "Organização internacional",
+        "Outro"
+      ]
+    },
+    {
+      "key": "provincia",
+      "section": 2,
+      "label": "Província",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "distrito",
+      "section": 2,
+      "label": "Distrito ou distrito municipal",
+      "required": true,
+      "options": []
+    },
+    {
+      "key": "posto",
+      "section": 2,
+      "label": "Posto administrativo",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "localidade",
+      "section": 2,
+      "label": "Localidade ou bairro",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "instituicao",
+      "section": 2,
+      "label": "Nome completo da instituição ou unidade sanitária (Onde trabalha)",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "tipo",
+      "section": 2,
+      "label": "Tipo de instituição",
+      "required": true,
+      "options": [
+        "Hospital central",
+        "Hospital provincial",
+        "Hospital geral",
+        "Hospital distrital",
+        "Hospital rural",
+        "Centro de saúde",
+        "Posto de saúde",
+        "Clínica / Centro médico",
+        "Laboratório",
+        "Serviço / Direcção de saúde",
+        "Ensino / Investigação",
+        "Outra"
+      ]
+    },
+    {
+      "key": "servico",
+      "section": 2,
+      "label": "Serviço ou departamento",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "categoria",
+      "section": 3,
+      "label": "Categoria profissional ou perfil",
+      "required": true,
+      "options": [
+        "Médico/a",
+        "Enfermeiro/a",
+        "Técnico/a de medicina",
+        "Técnico/a de medicina preventiva",
+        "Técnico/a de laboratório",
+        "Farmacêutico/a / Técnico/a de farmácia",
+        "Nutricionista / Técnico/a de nutrição",
+        "Profissional de saúde materna e infantil",
+        "Agente polivalente elementar / Agente comunitário",
+        "Gestor/a de serviços de saúde",
+        "Profissional de monitoria e avaliação / Dados",
+        "Docente",
+        "Investigador/a",
+        "Estudante",
+        "Outro"
+      ]
+    },
+    {
+      "key": "nivel",
+      "section": 3,
+      "label": "Nível de formação concluído",
+      "required": true,
+      "options": [
+        "Ensino primário",
+        "Ensino secundário",
+        "Técnico básico",
+        "Técnico médio",
+        "Técnico Profissional",
+        "Bacharelato",
+        "Licenciatura",
+        "Pós-graduação / Especialização",
+        "Mestrado",
+        "Doutoramento",
+        "Outro"
+      ]
+    },
+    {
+      "key": "area",
+      "section": 3,
+      "label": "Área de formação",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "experiencia",
+      "section": 3,
+      "label": "Experiência profissional na área da saúde",
+      "required": true,
+      "options": [
+        "Sem experiência",
+        "Menos de 1 ano",
+        "1 a 3 anos",
+        "4 a 6 anos",
+        "7 a 10 anos",
+        "Mais de 10 anos"
+      ]
+    },
+    {
+      "key": "funcao",
+      "section": 3,
+      "label": "Função actual",
+      "required": false,
+      "options": []
+    },
+    {
+      "key": "dispositivos",
+      "section": 4,
+      "label": "Dispositivo para acompanhar o curso",
+      "required": true,
+      "options": [
+        "Computador",
+        "Telemóvel / Smartphone",
+        "Tablet",
+        "Equipamento partilhado",
+        "Sem acesso a dispositivo"
+      ]
+    },
+    {
+      "key": "internet",
+      "section": 4,
+      "label": "Acesso à Internet",
+      "required": true,
+      "options": [
+        "Regular e estável",
+        "Limitado / Dados móveis",
+        "Ocasional",
+        "Sem acesso"
+      ]
+    },
+    {
+      "key": "cursoAnterior",
+      "section": 4,
+      "label": "Já frequentou um curso sobre este tema?",
+      "required": true,
+      "options": [
+        "Sim",
+        "Não"
+      ]
+    }
+  ],
+  "districts": {
+    "Niassa": [
+      "Chimbunila",
+      "Cuamba",
+      "Lago",
+      "Lichinga",
+      "Majune",
+      "Mandimba",
+      "Marrupa",
+      "Maúa",
+      "Mavago",
+      "Mecanhelas",
+      "Mecula",
+      "Metarica",
+      "Muembe",
+      "Ngauma",
+      "Nipepe",
+      "Sanga"
+    ],
+    "Cabo Delgado": [
+      "Ancuabe",
+      "Balama",
+      "Chiúre",
+      "Ibo",
+      "Macomia",
+      "Mecúfi",
+      "Meluco",
+      "Metuge",
+      "Mocímboa da Praia",
+      "Montepuez",
+      "Mueda",
+      "Muidumbe",
+      "Namuno",
+      "Nangade",
+      "Palma",
+      "Pemba",
+      "Quissanga"
+    ],
+    "Nampula": [
+      "Angoche",
+      "Eráti",
+      "Ilha de Moçambique",
+      "Lalaua",
+      "Larde",
+      "Liúpo",
+      "Malema",
+      "Meconta",
+      "Mecubúri",
+      "Memba",
+      "Mogincual",
+      "Mogovolas",
+      "Moma",
+      "Monapo",
+      "Mossuril",
+      "Muecate",
+      "Murrupula",
+      "Nacala-a-Velha",
+      "Nacala Porto",
+      "Nacarôa",
+      "Nampula",
+      "Rapale",
+      "Ribaué"
+    ],
+    "Zambézia": [
+      "Alto Molócuè",
+      "Chinde",
+      "Derre",
+      "Gilé",
+      "Gurúè",
+      "Ile",
+      "Inhassunge",
+      "Luabo",
+      "Lugela",
+      "Maganja da Costa",
+      "Milange",
+      "Mocuba",
+      "Mocubela",
+      "Molumbo",
+      "Mopeia",
+      "Morrumbala",
+      "Mulevala",
+      "Namacurra",
+      "Namarrói",
+      "Nicoadala",
+      "Pebane",
+      "Quelimane"
+    ],
+    "Tete": [
+      "Angónia",
+      "Cahora Bassa",
+      "Changara",
+      "Chifunde",
+      "Chiuta",
+      "Dôa",
+      "Macanga",
+      "Magoé",
+      "Marara",
+      "Marávia",
+      "Moatize",
+      "Mutarara",
+      "Tete",
+      "Tsangano",
+      "Zumbo"
+    ],
+    "Manica": [
+      "Báruè",
+      "Chimoio",
+      "Gondola",
+      "Guro",
+      "Macate",
+      "Machaze",
+      "Macossa",
+      "Manica",
+      "Mossurize",
+      "Sussundenga",
+      "Tambara",
+      "Vanduzi"
+    ],
+    "Sofala": [
+      "Beira",
+      "Búzi",
+      "Caia",
+      "Chemba",
+      "Cheringoma",
+      "Chibabava",
+      "Dondo",
+      "Gorongosa",
+      "Machanga",
+      "Marínguè",
+      "Marromeu",
+      "Muanza",
+      "Nhamatanda"
+    ],
+    "Inhambane": [
+      "Funhalouro",
+      "Govuro",
+      "Homoíne",
+      "Inhambane",
+      "Inharrime",
+      "Inhassoro",
+      "Jangamo",
+      "Mabote",
+      "Massinga",
+      "Maxixe",
+      "Morrumbene",
+      "Panda",
+      "Vilankulo",
+      "Zavala"
+    ],
+    "Gaza": [
+      "Bilene",
+      "Chibuto",
+      "Chicualacuala",
+      "Chigubo",
+      "Chókwè",
+      "Chongoene",
+      "Guijá",
+      "Limpopo",
+      "Mabalane",
+      "Mandlakazi",
+      "Mapai",
+      "Massangena",
+      "Massingir",
+      "Xai-Xai"
+    ],
+    "Maputo Província": [
+      "Boane",
+      "Magude",
+      "Manhiça",
+      "Marracuene",
+      "Matola",
+      "Matutuíne",
+      "Moamba",
+      "Namaacha"
+    ],
+    "Maputo Cidade": [
+      "KaMpfumu",
+      "Nlhamankulu",
+      "KaMaxakeni",
+      "KaMavota",
+      "KaMubukwana",
+      "KaTembe",
+      "KaNyaka"
+    ]
+  },
+  "declarations": [
+    "Confirmo que o nome indicado para o certificado está correcto e deve ser usado na sua emissão.",
+    "Declaro que os dados fornecidos são verdadeiros e que revi a informação desta ficha."
+  ]
+}
