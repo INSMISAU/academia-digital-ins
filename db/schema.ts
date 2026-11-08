@@ -38,3 +38,12 @@ export const validationAcademyEntryHistory=sqliteTable('validation_academy_entry
 export const validationAcademyCohortMembers=sqliteTable('validation_academy_cohort_members',{cohortId:text().notNull().references(()=>validationCohorts.id),enrollmentId:text().notNull().references(()=>validationEnrollments.id),created:text().notNull()},t=>[primaryKey({columns:[t.cohortId,t.enrollmentId]})]);
 export const validationAcademyAttendance=sqliteTable('validation_academy_attendance',{cohortId:text().notNull().references(()=>validationCohorts.id),enrollmentId:text().notNull().references(()=>validationEnrollments.id),sessionDate:text().notNull(),state:text().notNull(),updated:text().notNull()},t=>[primaryKey({columns:[t.cohortId,t.enrollmentId,t.sessionDate]})]);
 export const validationAcademyAssessmentRuns=sqliteTable('validation_academy_assessment_runs',{id:text().primaryKey(),enrollmentId:text().notNull().references(()=>validationEnrollments.id),assessmentId:text().notNull(),stage:text().notNull(),state:text().notNull(),started:text().notNull(),deadline:text(),snapshot:text().notNull(),answers:text(),review:text(),score:integer(),submitted:text()},t=>[index('validation_academy_assessment_runs_enrollment').on(t.enrollmentId,t.assessmentId,t.started),uniqueIndex('validation_academy_assessment_one_active').on(t.enrollmentId,t.assessmentId).where(sql`state = 'active'`)]);
+
+// Fichas pessoais não integram as listagens públicas ou administrativas existentes.
+export const registrationSettings=sqliteTable('academy_registration_settings',{
+ id:integer().primaryKey(),enabled:integer().notNull().default(0),notice:text().notNull().default(''),
+});
+export const registrationForms=sqliteTable('academy_registration_forms',{
+ reference:text().primaryKey(),courseId:text().notNull().references(()=>courses.id),owner:text().notNull(),emailKey:text().notNull(),
+ payload:text().notNull(),certificateName:text().notNull(),notice:text().notNull(),created:text().notNull(),
+},t=>[uniqueIndex('registration_owner_course').on(t.owner,t.courseId),uniqueIndex('registration_email_course').on(t.emailKey,t.courseId)]);
