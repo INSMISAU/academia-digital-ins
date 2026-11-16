@@ -1,4 +1,6 @@
 import {GET as read} from '@/app/api/resource/[id]/route';
-import {runAdministration} from '@/db/administration';
+import {withTeam} from '@/lib/team-access';
 export const dynamic='force-dynamic';
-export const GET=(req:Request,context:{params:Promise<{id:string}>})=>runAdministration(()=>read(req,context));
+export const GET=(req:Request,context:{params:Promise<{id:string}>})=>withTeam(req,()=>read(req,context));
+
+export {pagesPreflight as OPTIONS} from '@/lib/academy-cors';

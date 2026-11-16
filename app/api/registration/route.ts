@@ -4,10 +4,11 @@ import {db} from '@/db/store';
 import {registrationStatus,submitRegistration} from '@/lib/registration-service';
 import {enabledProviders} from '@/lib/registration-identity';
 import {externalToken,digest} from '@/lib/registration-session';
+import {inValidation} from '@/db/validation';
 export const dynamic='force-dynamic';
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 export function GET(req:Request){return withPagesCors(req,async()=>{
- try{const state=await registrationStatus(db());return reply({...state,formVersion:2,providers:state.open?enabledProviders():[]});}catch{return reply({open:false,notice:''},503);}
+ try{const state=await registrationStatus(db());return reply({...state,formVersion:2,providers:state.open&&!inValidation()?enabledProviders():[]});}catch{return reply({open:false,notice:''},503);}
 });}
 export function POST(req:Request){return withPagesCors(req,async()=>{
  if(!permittedOrigin(req))return reply({error:'Origem não autorizada.'},403);

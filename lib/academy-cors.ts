@@ -18,7 +18,7 @@ export async function withPagesCors(req: Request, handle: () => Promise<Response
 function corsHeaders(response: Response) {
   response.headers.set('Access-Control-Allow-Origin', pagesOrigin);
   response.headers.append('Vary', 'Origin');
-  // No cross-site cookies or administration credentials are accepted.
+  // Participant and technical-team capabilities use explicit headers, not cookies.
   response.headers.delete('Set-Cookie');
   return response;
 }
@@ -27,11 +27,11 @@ export function pagesPreflight(req: Request) {
   if (req.headers.get('Origin') !== pagesOrigin) return new Response(null, {status: 403});
   const method = req.headers.get('Access-Control-Request-Method');
   const headers = (req.headers.get('Access-Control-Request-Headers') || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
-  if (!['GET', 'POST'].includes(method || '') || headers.some(h => !['authorization', 'content-type'].includes(h))) return new Response(null, {status: 403});
+  if (!['GET', 'POST'].includes(method || '') || headers.some(h => !['authorization', 'content-type', 'x-academy-team', 'x-academy-mode'].includes(h))) return new Response(null, {status: 403});
   return new Response(null, {status: 204, headers: {
     'Access-Control-Allow-Origin': pagesOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Academy-Team, X-Academy-Mode',
     'Access-Control-Max-Age': '600',
     'Vary': 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
   }});

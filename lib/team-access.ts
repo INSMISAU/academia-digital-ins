@@ -1,0 +1,39 @@
+import {env} from 'cloudflare:workers';
+import {withPagesCors} from './academy-cors';
+import {runAdministration} from '@/db/administration';
+import {runValidation} from '@/db/validation';
+import {isAdmin} from '@/db/access';
+
+// Independent, revocable capabilities for the internal technical team.
+// Only hashes live in runtime configuration; no key is embedded in source.
+type Access={id:string;label:string;hash:string;expires:number};
+export async function teamAccess(req:Request):Promise<Access|null>{
+ const token=req.headers.get('X-Academy-Team')||'';
+ if(!/^[a-f0-9]{64}$/.test(token))return null;
+ try{
+  const configured=JSON.parse((env as unknown as Record<string,string>).INS_TEAM_ACCESS||'[]');
+  if(!Array.isArray(configured))return null;
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))),b=>b.toString(16).padStart(2,'0')).join('');
+  return configured.find((a:Access)=>a&&typeof a.id==='string'&&typeof a.label==='string'&&a.hash===hash&&Number.isFinite(a.expires)&&a.expires>Date.now())||null;
+ }catch{return null;}
+}
+export function withTeam(req:Request,handle:()=>Promise<Response>,validation=false){
+ return withPagesCors(req,async()=>{
+  const access=await teamAccess(req);
+  if(!access&&!isAdmin(req))return Response.json({error:'Acesso reservado à equipa técnica. Utilize a sua ligação privada.'},{status:401,headers:{'Cache-Control':'no-store'}});
+  return validation?runValidation(handle,req.headers.get('X-Academy-Mode')!=='participant'):runAdministration(handle);
+ });
+}
+
+// Copy course content only: no participants, submissions or production settings.
+// Repeated entries preserve every record previously changed by the testers.
+export async function prepareValidation(){
+ const database=env.DB;
+ if(!database)throw Error('Base de dados indisponível.');
+ const names=['courses','lessons','questions','academy_entries'];
+ const privacy=JSON.stringify({purpose:'Validação técnica com dados fictícios.',controller:'Equipa técnica interna da Ologa.',access:'Acessos técnicos privados da Ologa.',retention:'Apenas durante a validação interna.',corrections:'Equipa técnica interna da Ologa.'});
+ await database.batch([
+  ...names.map(name=>database.prepare(`INSERT OR IGNORE INTO validation_${name} SELECT * FROM ${name}`)),
+  database.prepare("INSERT OR IGNORE INTO validation_academy_registration_settings(id,enabled,notice,privacy) VALUES(1,1,?,?)").bind('Utilize exclusivamente dados fictícios nesta área de testes interna.',privacy),
+ ]);
+}

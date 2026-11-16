@@ -1,3 +1,5 @@
 import {GET as download} from '@/app/api/media/[id]/route';
-import {runValidation} from '@/db/validation';
-export const GET = (req: Request, context: {params: Promise<{id: string}>}) => runValidation(() => download(req, context));
+import {withTeam} from '@/lib/team-access';
+export const GET = (req: Request, context: {params: Promise<{id: string}>}) => withTeam(req,()=>download(req, context),true);
+
+export {pagesPreflight as OPTIONS} from '@/lib/academy-cors';

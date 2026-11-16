@@ -63,3 +63,12 @@ export const registrationMailChecks=sqliteTable('registration_mail_checks',{
 export const registrationMailLimits=sqliteTable('registration_mail_limits',{
  bucket:text().primaryKey(),until:integer().notNull(),count:integer().notNull(),
 });
+
+// Internal registration tests use separate records and settings.
+export const validationRegistrationSettings=sqliteTable('validation_academy_registration_settings',{
+ id:integer().primaryKey(),enabled:integer().notNull().default(0),notice:text().notNull().default(''),privacy:text(),
+});
+export const validationRegistrationForms=sqliteTable('validation_academy_registration_forms',{
+ reference:text().primaryKey(),courseId:text().notNull().references(()=>validationCourses.id),owner:text().notNull(),emailKey:text().notNull(),
+ payload:text().notNull(),certificateName:text().notNull(),notice:text().notNull(),created:text().notNull(),verifiedContact:text(),
+},t=>[uniqueIndex('validation_registration_owner_course').on(t.owner,t.courseId),uniqueIndex('validation_registration_email_course').on(t.emailKey,t.courseId)]);

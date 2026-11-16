@@ -2,11 +2,12 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 
 // Only the dedicated validation routes enter this context. Request headers and
 // client identifiers never grant access to the original administrative data.
-const context = new AsyncLocalStorage<boolean>();
-export const inValidation = () => context.getStore() === true;
-export const runValidation = <T>(handle: () => T): T => context.run(true, handle);
+const context = new AsyncLocalStorage<{admin:boolean}>();
+export const inValidation = () => !!context.getStore();
+export const validationAdmin = () => context.getStore()?.admin===true;
+export const runValidation = <T>(handle: () => T, admin=true): T => context.run({admin}, handle);
 
-const tables = 'academy_entries|academy_entry_history|academy_cohort_members|academy_attendance|academy_assessment_runs|courses|lessons|questions|enrollments|progress|attempts|certificates|cohorts|media|audit|reviews|snapshots';
+const tables = 'academy_registration_forms|academy_registration_settings|academy_entries|academy_entry_history|academy_cohort_members|academy_attendance|academy_assessment_runs|courses|lessons|questions|enrollments|progress|attempts|certificates|cohorts|media|audit|reviews|snapshots';
 const tableReference = new RegExp('\\b(FROM|JOIN|INTO|UPDATE)\\s+(' + tables + ')\\b', 'gi');
 
 // SQL is application-owned, never visitor supplied. Rewrite table references,

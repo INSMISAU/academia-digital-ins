@@ -2,7 +2,7 @@ import {cleanAnswers} from './registration';
 type Store={prepare:(sql:string)=>D1PreparedStatement;batch:(statements:D1PreparedStatement[])=>Promise<unknown>};
 type Settings={enabled:number;notice:string;privacy:string|null};
 const headings={purpose:'Finalidade da recolha',controller:'Responsáveis',access:'Acessos autorizados',retention:'Prazo de conservação',corrections:'Contacto para correcções'};
-function privacyNotice(raw:string|null){
+export function privacyNotice(raw:string|null){
  try{const data=JSON.parse(raw||'null');if(!data||Object.keys(headings).some(k=>typeof data[k]!=='string'||!data[k].trim()))return '';
  return Object.entries(headings).map(([k,label])=>label+': '+data[k].trim()).join('\n');}catch{return '';}
 }

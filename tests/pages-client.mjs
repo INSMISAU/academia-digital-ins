@@ -13,7 +13,7 @@ let clock = Date.now();
 const requests = [];
 function client(origin, storage = localStorage, search = '') {
   const context = {exports: {}, __ACADEMY_API_ORIGIN__: origin, Headers, crypto: webcrypto,
-    Date: {now: () => clock}, localStorage: storage, location: {search}, URLSearchParams,
+    Date: {now: () => clock}, localStorage: storage, sessionStorage: storage, location: {search}, URLSearchParams,
     fetch: (url, init) => { requests.push({url, init}); return Promise.resolve(new Response('{}')); },
   };
   vm.runInNewContext(code, context);
@@ -21,14 +21,14 @@ function client(origin, storage = localStorage, search = '') {
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
 assert.equal(client(origin).academyAdministrationUrl(false),'?administracao=1#gestao');
-assert.equal(client('').academyAdministrationUrl(false),'https://insmisau.github.io/academia-digital-ins/?administracao=1#gestao');
-assert.equal(client('').academyAdministrationUrl(true),'https://insmisau.github.io/academia-digital-ins/?administracao=1#gestao');
-// Prevent the hosted button from reintroducing the ChatGPT sign-in flow.
-const hostedAdministration = new URL(client('').academyAdministrationUrl(false));
-assert.equal(hostedAdministration.origin, 'https://insmisau.github.io');
+assert.equal(client('').academyAdministrationUrl(false),'?administracao=1#gestao');
+assert.equal(client('').academyAdministrationUrl(true),'?administracao=1#gestao');
+// Keep the private capability on its original origin; no email collection or sign-in redirect.
+const hostedAdministration = new URL(client('').academyAdministrationUrl(false),origin);
+assert.equal(hostedAdministration.origin, origin);
 assert.equal(hostedAdministration.searchParams.get('administracao'), '1');
 assert.equal(hostedAdministration.hash, '#gestao');
-assert(!/signin|chatgpt\.site/.test(hostedAdministration.href));
+assert(!/signin/.test(hostedAdministration.href));
 assert.equal(client(origin).academyPublicUrl,'https://insmisau.github.io/academia-digital-ins/');
 const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
 await client(origin).academyFetch('/api/academy');
@@ -55,13 +55,22 @@ assert.equal(requests.at(-1).url, '/api/academy');
 assert.equal(requests.at(-1).init.credentials, 'same-origin');
 assert.equal(requests.at(-1).init.headers.has('Authorization'), false, 'The existing Site retains cookie sessions');
 const testClient=client(origin,localStorage,'?validacao=1');
-assert.equal(testClient.academyAdministration(),true);
+assert.equal(testClient.academyAdministration(),false);
 assert.equal(client(origin,localStorage,'?administracao=1').academyAdministration(),true);
 await testClient.academyFetch('/api/academy?course=orientacao');
-assert.equal(requests.at(-1).url,origin+'/api/administration/academy?course=orientacao');
-assert.equal(testClient.academyUrl('/api/media/test-file'),origin+'/api/administration/media/test-file');
+assert.equal(requests.at(-1).url,origin+'/api/validation/academy?course=orientacao');
+assert.equal(testClient.academyUrl('/api/media/test-file'),origin+'/api/validation/media/test-file');
 assert.equal(testClient.academyUrl('/verify/TEST'),origin+'/verify/TEST');
 assert.equal(client(origin).academyUrl('/api/media/test-file'),origin+'/api/media/test-file');
+const priv=client(origin,localStorage,'?validacao=1&perfil=participante');
+priv.setTeamAccess('f'.repeat(64));
+await priv.academyFetch('/api/registration');
+assert.equal(requests.at(-1).init.headers.get('X-Academy-Team'),'f'.repeat(64));
+assert.equal(requests.at(-1).init.headers.get('X-Academy-Mode'),'participant');
+const savedBrowserSession=store.get('ins-academia-demo-session-v1');
+priv.beginParticipant();assert.equal(store.get('ins-academia-demo-session-v1'),savedBrowserSession);
+await client(origin).academyFetch('/api/academy');
+assert.equal(requests.at(-1).init.headers.has('X-Academy-Team'),false);
 const html = readFileSync('index.html', 'utf8');
 assert.match(html, /lang="pt-MZ"/);
 for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {

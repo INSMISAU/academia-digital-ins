@@ -1,6 +1,6 @@
 import {GET as readAcademy, POST as writeAcademy, OPTIONS as preflight} from '@/app/api/academy/route';
-import {runValidation} from '@/db/validation';
+import {withTeam} from '@/lib/team-access';
 export const dynamic = 'force-dynamic';
-export const GET = (req: Request) => runValidation(() => readAcademy(req));
-export const POST = (req: Request) => runValidation(() => writeAcademy(req));
+export const GET = (req: Request) => withTeam(req,()=>readAcademy(req),true);
+export const POST = (req: Request) => withTeam(req,()=>writeAcademy(req),true);
 export const OPTIONS = preflight;

@@ -31,10 +31,10 @@ function sessionToken() {
 }
 
 // Keep participant sessions confined to this tab, including on shared equipment.
-const participantKey='ins-ficha-participante-v1';
+const participantKey=()=>academyValidation()?'ins-ficha-participante-teste-v1':'ins-ficha-participante-v1';
 let activeParticipant:Session|undefined;
 function currentParticipant(){
- try{const text=sessionStorage.getItem(participantKey);if(text)activeParticipant=JSON.parse(text);}catch{}
+ try{const text=sessionStorage.getItem(participantKey());if(text)activeParticipant=JSON.parse(text);}catch{}
  if(!activeParticipant||!/^([a-f0-9]{64})$/.test(activeParticipant.token))return '';
  if(activeParticipant.expires<=Date.now()&&!activeParticipant.token.startsWith('a0ce5510ade0'))return beginParticipant();
  return activeParticipant.token;
@@ -42,41 +42,52 @@ function currentParticipant(){
 export function setParticipantSession(token:string){
  if(!/^[a-f0-9]{64}$/.test(token))throw Error('Sessão inválida.');
  activeParticipant={token,expires:Date.now()+(token.startsWith('a0ce5510ade0')?8*3600000:lifetime)};
- try{sessionStorage.setItem(participantKey,JSON.stringify(activeParticipant));}catch{}
+ try{sessionStorage.setItem(participantKey(),JSON.stringify(activeParticipant));}catch{}
 }
 export function beginParticipant(){
  const token=academyRequestId()+academyRequestId();
  // New tabs must not recover the previous participant through the legacy browser-wide token.
- memorySession={token:academyRequestId()+academyRequestId(),expires:Date.now()+lifetime};
- try{localStorage.setItem(storageKey,JSON.stringify(memorySession));}catch{}
+ if(!academyValidation()){
+  memorySession={token:academyRequestId()+academyRequestId(),expires:Date.now()+lifetime};
+  try{localStorage.setItem(storageKey,JSON.stringify(memorySession));}catch{}
+ }
  setParticipantSession(token);return token;
 }
 export const hasExternalSession=()=>currentParticipant().startsWith('a0ce5510ade0');
 export const participantScope=()=>currentParticipant();
 
 export function academyAdministration() {
-  return typeof location !== 'undefined' && ['administracao','validacao'].some(key=>new URLSearchParams(location.search).get(key)==='1');
+  return typeof location !== 'undefined' && new URLSearchParams(location.search).get('administracao')==='1';
 }
+export function academyValidation(){return typeof location!=='undefined'&&new URLSearchParams(location.search).get('validacao')==='1';}
+export function academyParticipantTest(){return academyValidation()&&new URLSearchParams(location.search).get('perfil')==='participante';}
+const teamKey='ins-ologatecnica-access-v1';
+export function setTeamAccess(key:string){if(!/^[a-f0-9]{64}$/.test(key))throw Error('Ligação privada inválida.');sessionStorage.setItem(teamKey,key);}
+export function clearTeamAccess(){sessionStorage.removeItem(teamKey);beginParticipant();location.assign(location.pathname);}
+function teamToken(){try{return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
 export function academyUrl(path: string) {
-  if (academyAdministration()) {
-    if (path.startsWith('/api/')) path = '/api/administration/' + path.slice(5);
+  if (path.startsWith('/api/')&&!path.startsWith('/api/team-access')) {
+    if(academyValidation())path='/api/validation/'+path.slice(5);
+    else if(academyAdministration())path='/api/administration/'+path.slice(5);
   }
   return academyOrigin + path;
 }
 
 export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins/';
 
-// Pages is the canonical public administration entry. The hosted service
-// must leave its own origin when entering administration, so validation does
-// not depend on a ChatGPT session. Accounts and roles remain the final stage.
+// Keep the technical access in the same tab and origin as its private capability.
 export function academyAdministrationUrl(_isAdmin?: boolean) {
-  return academyOrigin ? '?administracao=1#gestao' : academyPublicUrl + '?administracao=1#gestao';
+  return '?administracao=1#gestao';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const active=academyAdministration()?'':currentParticipant();
-  if (active||academyOrigin) headers.set('Authorization', 'Bearer ' + (active||sessionToken()));
+  if (active||academyOrigin||academyValidation()) headers.set('Authorization', 'Bearer ' + (active||sessionToken()));
+  if(path.startsWith('/api/team-access')||academyAdministration()||academyValidation()){
+    const token=teamToken();if(token)headers.set('X-Academy-Team',token);
+    if(academyParticipantTest())headers.set('X-Academy-Mode','participant');
+  }
   return fetch(academyUrl(path), {
     ...init, headers, credentials: academyOrigin ? 'omit' : 'same-origin',
   });
@@ -126,5 +137,9 @@ export async function downloadCertificate(id: string, code: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-// Compatibility for links already shared before the administrative correction.
-export const academyValidation = academyAdministration;
+export async function downloadMaterial(id:string,name:string){
+ const response=await academyFetch('/api/media/'+encodeURIComponent(id),{cache:'no-store'});
+ if(!response.ok)throw Error('Não foi possível descarregar o material.');
+ const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');
+ link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
