@@ -30,6 +30,30 @@ function sessionToken() {
   return session.token;
 }
 
+// Keep participant sessions confined to this tab, including on shared equipment.
+const participantKey='ins-ficha-participante-v1';
+let activeParticipant:Session|undefined;
+function currentParticipant(){
+ try{const text=sessionStorage.getItem(participantKey);if(text)activeParticipant=JSON.parse(text);}catch{}
+ if(!activeParticipant||!/^([a-f0-9]{64})$/.test(activeParticipant.token))return '';
+ if(activeParticipant.expires<=Date.now()&&!activeParticipant.token.startsWith('a0ce5510ade0'))return beginParticipant();
+ return activeParticipant.token;
+}
+export function setParticipantSession(token:string){
+ if(!/^[a-f0-9]{64}$/.test(token))throw Error('Sessão inválida.');
+ activeParticipant={token,expires:Date.now()+(token.startsWith('a0ce5510ade0')?8*3600000:lifetime)};
+ try{sessionStorage.setItem(participantKey,JSON.stringify(activeParticipant));}catch{}
+}
+export function beginParticipant(){
+ const token=academyRequestId()+academyRequestId();
+ // New tabs must not recover the previous participant through the legacy browser-wide token.
+ memorySession={token:academyRequestId()+academyRequestId(),expires:Date.now()+lifetime};
+ try{localStorage.setItem(storageKey,JSON.stringify(memorySession));}catch{}
+ setParticipantSession(token);return token;
+}
+export const hasExternalSession=()=>currentParticipant().startsWith('a0ce5510ade0');
+export const participantScope=()=>currentParticipant();
+
 export function academyAdministration() {
   return typeof location !== 'undefined' && ['administracao','validacao'].some(key=>new URLSearchParams(location.search).get(key)==='1');
 }
@@ -51,7 +75,8 @@ export function academyAdministrationUrl(_isAdmin?: boolean) {
 
 export function academyFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
-  if (academyOrigin) headers.set('Authorization', 'Bearer ' + sessionToken());
+  const active=academyAdministration()?'':currentParticipant();
+  if (active||academyOrigin) headers.set('Authorization', 'Bearer ' + (active||sessionToken()));
   return fetch(academyUrl(path), {
     ...init, headers, credentials: academyOrigin ? 'omit' : 'same-origin',
   });

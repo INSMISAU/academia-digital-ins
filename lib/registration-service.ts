@@ -1,12 +1,17 @@
 import {cleanAnswers} from './registration';
 type Store={prepare:(sql:string)=>D1PreparedStatement;batch:(statements:D1PreparedStatement[])=>Promise<unknown>};
-type Settings={enabled:number;notice:string};
+type Settings={enabled:number;notice:string;privacy:string|null};
+const headings={purpose:'Finalidade da recolha',controller:'Responsáveis',access:'Acessos autorizados',retention:'Prazo de conservação',corrections:'Contacto para correcções'};
+function privacyNotice(raw:string|null){
+ try{const data=JSON.parse(raw||'null');if(!data||Object.keys(headings).some(k=>typeof data[k]!=='string'||!data[k].trim()))return '';
+ return Object.entries(headings).map(([k,label])=>label+': '+data[k].trim()).join('\n');}catch{return '';}
+}
 export async function registrationStatus(store:Store){
- const s=await store.prepare('SELECT enabled,notice FROM academy_registration_settings WHERE id=1').first<Settings>();
- return {open:s?.enabled===1&&!!s.notice.trim(),notice:s?.notice||''};
+ const s=await store.prepare('SELECT enabled,notice,privacy FROM academy_registration_settings WHERE id=1').first<Settings>();
+ const privacy=privacyNotice(s?.privacy||null);return {open:s?.enabled===1&&!!privacy,notice:privacy?[s?.notice.trim(),privacy].filter(Boolean).join('\n\n'):''};
 }
 const result=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
-export async function submitRegistration(store:Store, owner:string, input:any){
+export async function submitRegistration(store:Store, owner:string, input:any, verifiedContact:string|null=null){
  const state=await registrationStatus(store);
  if(!state.open)return result({error:'As inscrições ainda não estão abertas.'},403);
  if(!input||input.confirmName!==true||input.confirmData!==true||input.notice!==state.notice)return result({error:'Reveja os dados e confirme as duas declarações e o aviso apresentado.'},400);
@@ -15,11 +20,13 @@ export async function submitRegistration(store:Store, owner:string, input:any){
  if(!course)return result({error:'O curso não está disponível para inscrição.'},404);
  const {answers,errors}=cleanAnswers(input.answers);
  if(Object.keys(errors).length)return result({errors,error:'Reveja os campos indicados.'},422);
+ const raw=await store.prepare('SELECT enabled,notice,privacy FROM academy_registration_settings WHERE id=1').first<Settings>();
+ if(!raw||!raw.privacy||[raw.notice.trim(),privacyNotice(raw.privacy)].filter(Boolean).join('\n\n')!==state.notice)return result({error:'O aviso foi actualizado. Volte a abrir a ficha.'},409);
  const payload=JSON.stringify(answers), reference='INS-'+crypto.randomUUID().toUpperCase(), created=new Date().toISOString();
  const email=String(answers.email).toLowerCase();
  const emailKey=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(id+'\n'+email))),b=>b.toString(16).padStart(2,'0')).join('');
- const inserts=[store.prepare(`INSERT OR IGNORE INTO academy_registration_forms(reference,courseId,owner,emailKey,payload,certificateName,notice,created)
- SELECT ?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM academy_registration_settings WHERE id=1 AND enabled=1 AND notice=?) AND EXISTS (SELECT 1 FROM courses WHERE id=? AND status='publicado')`).bind(reference,id,owner,emailKey,payload,answers.certificado,state.notice,created,state.notice,id)];
+ const inserts=[store.prepare(`INSERT OR IGNORE INTO academy_registration_forms(reference,courseId,owner,emailKey,payload,certificateName,notice,created,verifiedContact)
+ SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM academy_registration_settings WHERE id=1 AND enabled=1 AND notice=? AND privacy=?) AND EXISTS (SELECT 1 FROM courses WHERE id=? AND status='publicado')`).bind(reference,id,owner,emailKey,payload,answers.certificado,state.notice,created,verifiedContact,raw.notice,raw.privacy,id)];
  // Existing dashboards see only a pseudonym. No personal answers are copied to their tables.
  if(!course.external)inserts.push(store.prepare(`INSERT INTO enrollments(id,courseId,participant,province,institution,visitorKey,created)
  SELECT ?,courseId,?,'Não indicada','Não indicada',owner,created FROM academy_registration_forms f

@@ -41,9 +41,25 @@ export const validationAcademyAssessmentRuns=sqliteTable('validation_academy_ass
 
 // Fichas pessoais não integram as listagens públicas ou administrativas existentes.
 export const registrationSettings=sqliteTable('academy_registration_settings',{
- id:integer().primaryKey(),enabled:integer().notNull().default(0),notice:text().notNull().default(''),
+ id:integer().primaryKey(),enabled:integer().notNull().default(0),notice:text().notNull().default(''),privacy:text(),
 });
 export const registrationForms=sqliteTable('academy_registration_forms',{
  reference:text().primaryKey(),courseId:text().notNull().references(()=>courses.id),owner:text().notNull(),emailKey:text().notNull(),
- payload:text().notNull(),certificateName:text().notNull(),notice:text().notNull(),created:text().notNull(),
+ payload:text().notNull(),certificateName:text().notNull(),notice:text().notNull(),created:text().notNull(),verifiedContact:text(),
 },t=>[uniqueIndex('registration_owner_course').on(t.owner,t.courseId),uniqueIndex('registration_email_course').on(t.emailKey,t.courseId)]);
+
+// Short-lived sign-in transactions. Store no provider password or access/refresh token.
+export const registrationIdentityFlows=sqliteTable('registration_identity_flows',{
+ state:text().primaryKey(),ticket:text().notNull().unique(),owner:text().notNull(),origin:text().notNull(),provider:text().notNull(),
+ nonce:text().notNull(),verifier:text().notNull(),browser:text(),phase:text().notNull(),expires:integer().notNull(),
+ account:text(),name:text(),email:text(),trusted:integer().notNull().default(0),
+});
+export const registrationSessions=sqliteTable('registration_sessions',{
+ token:text().primaryKey(),account:text().notNull(),name:text().notNull(),email:text().notNull(),trusted:integer().notNull(),expires:integer().notNull(),
+});
+export const registrationMailChecks=sqliteTable('registration_mail_checks',{
+ account:text().primaryKey(),email:text().notNull(),digest:text().notNull(),tries:integer().notNull(),expires:integer().notNull(),confirmed:integer().notNull().default(0),
+});
+export const registrationMailLimits=sqliteTable('registration_mail_limits',{
+ bucket:text().primaryKey(),until:integer().notNull(),count:integer().notNull(),
+});

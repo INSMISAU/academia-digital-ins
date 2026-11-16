@@ -22,15 +22,20 @@ try{
  await db.batch(['surtos','interno','rascunho'].map((id,i)=>db.prepare("INSERT OR IGNORE INTO courses(id,title,summary,category,status,hours,pass,version,external,updated) VALUES(?,?,'','',''||?,1,80,1,?,?)").bind(id,id,i===2?'rascunho':'publicado',i===0?'https://example.invalid/curso':null,'2026-11-08')));
  await post(sample,403);
  await db.prepare("INSERT INTO academy_registration_settings(id,enabled,notice) VALUES (1,1,?)").bind(notice).run();
+ await post(sample,403);
+ const privacy=JSON.stringify({purpose:'Ensaio local',controller:'Fictício',access:'Isolado',retention:'Temporário',corrections:'local@example.invalid'});
+ await db.prepare('UPDATE academy_registration_settings SET privacy=? WHERE id=1').bind(privacy).run();
+ sample.notice=(await (await mf.dispatchFetch(base)).json()).notice;
+ assert(sample.notice.includes('Contacto para correcções: local@example.invalid'));
  await post(sample,403,token,'https://example.invalid');
  await post({...sample,notice:'versão anterior'},400);await post({...sample,confirmName:false},400);await post({...sample,confirmData:false},400);
  await post({...sample,courseId:'rascunho'},404);
- for(const bad of [{distrito:'Boane'},{certificado:''},{telefone:'letras'},{email:'inválido'},{categoriaOutro:''},{situacao:'Profissional em actividade'},{dispositivos:['Computador','Tablet','Telemóvel / Smartphone']},{dispositivos:['Sem acesso a dispositivo','Tablet']}])await post({...sample,answers:{...a,...bad}},422);
+ for(const bad of [{distrito:'Boane'},{certificado:''},{telefone:'letras'},{email:'inválido'},{categoriaOutro:''},{situacao:'Profissional em actividade'},{dispositivos:['Computador','Tablet','Telemóvel / Smartphone']}])await post({...sample,answers:{...a,...bad}},422);
  assert.equal((await db.prepare('SELECT count(*) n FROM academy_registration_forms').first()).n,0);
- const receipt=await post({...sample,answers:{...a,instituicao:'Campo a dispensar'}},201);assert.match(receipt.reference,/^INS-[A-F0-9-]+$/);
+ a.funcao='Outro';a.dispositivos=['Sem acesso a dispositivo','Tablet'];const receipt=await post({...sample,answers:{...a,instituicao:'Campo a dispensar',funcaoOutro:'não guardar'}},201);assert.match(receipt.reference,/^INS-[A-F0-9-]+$/);
  const retry=await post(sample,200);assert.equal(retry.reference,receipt.reference);
  const record=await db.prepare('SELECT * FROM academy_registration_forms WHERE reference=?').bind(receipt.reference).first();
- assert.equal(record.certificateName,a.certificado);assert.equal(JSON.parse(record.payload).nome,a.nome);assert(!('instituicao' in JSON.parse(record.payload)));assert.equal(record.notice,notice);
+ assert.equal(record.certificateName,a.certificado);assert.equal(JSON.parse(record.payload).nome,a.nome);assert(!('instituicao' in JSON.parse(record.payload)));assert.equal(record.notice,sample.notice);assert(!('funcaoOutro' in JSON.parse(record.payload)));assert.equal(JSON.parse(record.payload).funcao,'Outro');
  const conflict=await post(sample,409,'b'.repeat(64));assert(!conflict.reference);await post({...sample,answers:{...a,telefone:'841234569'}},409);
  assert.equal((await db.prepare('SELECT count(*) n FROM enrollments WHERE courseId=?').bind('surtos').first()).n,0);
  const internal={...sample,courseId:'interno',answers:{...a,situacao:'Profissional em actividade',sector:'Público',tipo:'Hospital central'}};
@@ -40,10 +45,18 @@ try{
  const nameUrl='http://ins.test/test-certificate-name?id='+es.results[0].id;
  assert.equal(await (await mf.dispatchFetch(nameUrl,{headers:{Authorization:'Bearer '+token}})).json(),a.certificado);
  assert.equal(await (await mf.dispatchFetch(nameUrl,{headers:{Authorization:'Bearer '+'b'.repeat(64)}})).json(),null);
- const status=await mf.dispatchFetch(base,{headers:{Origin:pages,Authorization:'Bearer '+token}});assert.deepEqual(await status.json(),{open:true,notice});
+ const next='d'.repeat(64),b={...internal,answers:{...internal.answers,nome:'Outra pessoa',email:'outra@example.invalid',certificado:'Grafia da segunda pessoa'},nextParticipant:next};
+ const second=await post(b,201);assert.notEqual(second.reference,receipts[0].reference);assert.equal(second.participantSession,next);
+ assert.equal((await post(b,200)).reference,second.reference);assert.equal((await post(b,200,next)).reference,second.reference);
+ const e2=await db.prepare("SELECT e.id FROM enrollments e JOIN academy_registration_forms f ON f.owner=e.visitorKey AND f.courseId=e.courseId WHERE f.reference=?").bind(second.reference).first();
+ const secondUrl='http://ins.test/test-certificate-name?id='+e2.id;
+ assert.equal(await (await mf.dispatchFetch(secondUrl,{headers:{Authorization:'Bearer '+next}})).json(),b.answers.certificado);
+ assert.equal(await (await mf.dispatchFetch(nameUrl,{headers:{Authorization:'Bearer '+next}})).json(),null);
+ assert.equal(await (await mf.dispatchFetch(secondUrl,{headers:{Authorization:'Bearer '+token}})).json(),null);
+ const status=await mf.dispatchFetch(base,{headers:{Origin:pages,Authorization:'Bearer '+token}});assert.deepEqual(await status.json(),{open:true,notice:sample.notice,formVersion:2,providers:[]});
  // A database error in the second insert must roll back the personal form and never issue a reference.
  await db.prepare("CREATE TRIGGER deny_enroll BEFORE INSERT ON enrollments BEGIN SELECT RAISE(ABORT,'isolated failure'); END").run();
  await post({...internal,answers:{...internal.answers,email:'falha@example.invalid'}},503,'c'.repeat(64));
- assert.equal((await db.prepare('SELECT count(*) n FROM academy_registration_forms').first()).n,2);
+ assert.equal((await db.prepare('SELECT count(*) n FROM academy_registration_forms').first()).n,3);
  console.log('OK: '+checks+' respostas HTTP verificadas; requisitos, transacção, confirmação, repetição e isolamento validados em D1 temporária.');
 }finally{await mf.dispose();await fs.rm(tmp,{recursive:true,force:true});}
