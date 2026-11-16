@@ -1,0 +1,27 @@
+'use client';
+import {useState} from 'react';
+import {Button} from '@/components/ui/button';
+import {Progress} from '@/components/ui/progress';
+import {lessonPercent} from '@/lib/academy-catalogue';
+import {normalise} from '@/lib/academy-workspace';
+import './account.css';
+export function MyLearning({data,start,navigate,save}:{data:any;start:(e:any)=>void;navigate:(v:string)=>void;save:(b:any)=>Promise<void>}){
+ const [search,setSearch]=useState(''),[tab,setTab]=useState('todos'),[order,setOrder]=useState('recentes'),[page,setPage]=useState(0);
+ const entries=data.isAdmin?[]:data.enrollments;
+ const state=(e:any)=>e.eligible?'concluidos':e.done||e.visited||e.attempts?.length?'andamento':'por_iniciar';
+ const groups=[['todos','Todos'],['por_iniciar','Por iniciar'],['andamento','Em andamento'],['concluidos','Concluídos'],['arquivados','Arquivados']];
+ const matching=(e:any,id:string)=>id==='arquivados'?e.archived:!e.archived&&(id==='todos'||state(e)===id);
+ const filtered=entries.filter((e:any)=>matching(e,tab)&&normalise(e.c.title).includes(normalise(search))).sort((a:any,b:any)=>order==='titulo'?a.c.title.localeCompare(b.c.title,'pt'):order==='progresso'?lessonPercent(b)-lessonPercent(a):String(b.visited||b.created).localeCompare(a.visited||a.created));
+ const pages=Math.max(1,Math.ceil(filtered.length/6)),current=Math.min(page,pages-1),last=entries.filter((e:any)=>e.visited&&!e.archived).sort((a:any,b:any)=>b.visited.localeCompare(a.visited))[0];
+ return <><nav className="academy-personal-nav" aria-label="Meu perfil"><button className="text-button" onClick={()=>navigate('perfil')}>Meu perfil</button><button className="text-button" onClick={()=>navigate('certificados')}>Meus certificados</button></nav><div className="page-heading"><div><span className="eyebrow">O SEU PERCURSO</span><h1>Meus cursos</h1></div><Button onClick={()=>navigate('catalogo')}>Explorar catálogo</Button></div>
+ {data.isAdmin?<p>A gestão de participantes está em Inscrições. Use o perfil de participante para consultar um percurso pessoal.</p>:<>
+ <div className="metrics">{[['Por iniciar',entries.filter((e:any)=>state(e)==='por_iniciar').length],['Em andamento',entries.filter((e:any)=>state(e)==='andamento').length],['Concluídos',entries.filter((e:any)=>e.eligible).length],['Certificados',data.certificates.length]].map(([title,count])=><div className="metric" key={title}><span>{title}</span><strong>{count}</strong></div>)}</div>
+ {last&&<section className="panel"><h2>Continuar a aprender</h2><p>{last.c.title}{last.lastTitle?' · '+last.lastTitle:''}</p><Button onClick={()=>start(last)}>Retomar a última aula visitada</Button></section>}
+ <div className="academy-learning-controls"><label>Pesquisar cursos<input type="search" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/></label><label>Ordenar<select value={order} onChange={e=>{setOrder(e.target.value);setPage(0);}}><option value="recentes">Actividade mais recente</option><option value="titulo">Título</option><option value="progresso">Progresso</option></select></label></div>
+ <div className="academy-enrollment-filters" role="group" aria-label="Filtrar os meus cursos">{groups.map(([id,label])=><button key={id} aria-pressed={tab===id} onClick={()=>{setTab(id);setPage(0);}}>{label}<span>{entries.filter((e:any)=>matching(e,id)).length}</span></button>)}</div>
+ <div className="enrollment-grid">{filtered.slice(current*6,current*6+6).map((e:any)=><article className="panel academy-enrollment academy-personal-course" key={e.id}><span className="badge">{groups.find(([id])=>id===state(e))?.[1]}</span><h2>{e.c.title}</h2><p>{e.c.category}</p><div className="academy-progress-label"><span>Aulas concluídas</span><strong>{lessonPercent(e)}%</strong></div><Progress value={lessonPercent(e)} aria-label="Percentagem de aulas concluídas"/><p>{e.done} de {e.total} aulas · {e.best===null?'Sem avaliação':'Melhor nota: '+e.best+'%'}</p>{!e.eligible&&<p>{e.done<e.total?`Faltam ${e.total-e.done} aulas. `:''}{e.best===null||e.best<e.c.pass?`A avaliação exige uma nota mínima de ${e.c.pass}%.`:''}</p>}<div className="academy-enrollment-actions"><Button onClick={()=>start(e)}>{e.eligible?'Rever percurso':state(e)==='por_iniciar'?'Iniciar curso':'Continuar a aprender'}</Button><Button variant="outline" onClick={()=>void save({action:'learning_preference',enrollmentId:e.id,archived:!e.archived})}>{e.archived?'Retirar do arquivo':'Arquivar'}</Button></div></article>)}</div>
+ {data.registrations?.length>0&&<section><h2>Inscrições em cursos noutra plataforma</h2><div className="enrollment-grid">{data.registrations.map((r:any)=><article key={r.reference} className="panel academy-personal-course"><h3>{r.courseId==='surtos'?'Curso Básico em Investigação de Surtos':r.title}</h3><p>Inscrição registada · {r.reference}</p><a className="button-link" href={r.external} target="_blank" rel="noopener noreferrer">Abrir o curso</a></article>)}</div></section>}
+ {!filtered.length&&!data.registrations?.length&&<div className="empty"><h2>{entries.length?'Sem cursos neste filtro':'Ainda não tem cursos inscritos'}</h2><p>{entries.length?'Altere a pesquisa ou o filtro.':'Consulte os cursos disponíveis no catálogo.'}</p></div>}
+ {pages>1&&<nav className="academy-learning-pages" aria-label="Páginas dos meus cursos"><Button variant="outline" disabled={!current} onClick={()=>setPage(current-1)}>Anterior</Button><span>{current+1} de {pages}</span><Button variant="outline" disabled={current+1===pages} onClick={()=>setPage(current+1)}>Seguinte</Button></nav>}
+ </>}</>;
+}

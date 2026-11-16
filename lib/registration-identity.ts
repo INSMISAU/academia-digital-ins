@@ -1,3 +1,5 @@
+import {mailAvailable,sendAcademyMail} from './academy-mail';
+import {inValidation} from '@/db/validation';
 import {env} from 'cloudflare:workers';
 import * as oidc from 'oauth4webapi';
 import {db} from '@/db/store';
@@ -42,8 +44,8 @@ export async function identityAction(req:Request){
  const input=JSON.parse(await limitedText(req));const token=visitorToken(req);if(!token)return failure();
  const s=db(),key=await digest(token);
  if(input.action==='leave'){if(externalToken(token))await s.prepare('DELETE FROM registration_sessions WHERE token=?').bind(key).run();return json({ok:true});}
- if(!(await registrationStatus(s)).open)return json({error:'As inscrições ainda não estão abertas.'},403);
  if(input.action==='start'){
+  if(inValidation())return json({error:'O acesso externo utiliza as contas reais e não está disponível neste espaço de testes.'},403);
   const p=input.provider;if(!provider(p)||!config(p))return failure();
   if(!await limit('oauth:'+await digest(req.headers.get('CF-Connecting-IP')||key),30,600000))return json({error:'Aguarde antes de tentar novamente.'},429);
   await cleanExpired();const state=newVisitorToken(),ticket=newVisitorToken(),nonce=oidc.generateRandomNonce(),verifier=oidc.generateRandomCodeVerifier();
@@ -66,12 +68,12 @@ export async function identityAction(req:Request){
  if(!acct||!isMail(input.email))return failure();
  const email=norm(input.email);
  if(input.action==='send'){
-  const e=settings();if(!e.INS_EMAIL?.send||!isMail(e.INS_EMAIL_FROM))return json({error:'A verificação de email ainda não está disponível.'},503);
+  const e=settings();if(!mailAvailable())return json({error:'A verificação de email ainda não está disponível.'},503);
   if(!await limit('account:'+acct.account,1,60000)||!await limit('mail:'+await digest(email),5,3600000))return json({error:'Aguarde antes de pedir outro código.'},429);
   const bytes=crypto.getRandomValues(new Uint32Array(1));const code=String(bytes[0]%100000000).padStart(8,'0');
   const hash=await digest(acct.account+'|'+email+'|'+code);
   await s.prepare('INSERT OR REPLACE INTO registration_mail_checks(account,email,digest,tries,expires,confirmed) VALUES(?,?,?,0,?,0)').bind(acct.account,email,hash,Date.now()+600000).run();
-  try{await e.INS_EMAIL.send({from:e.INS_EMAIL_FROM,to:email,subject:'Academia do INS — verificação de email',text:'Código para confirmar o seu endereço de email na ficha de inscrição: '+code});}
+  try{await sendAcademyMail(email,'Academia do INS — verificação de email','Código para confirmar o seu endereço de email na ficha de inscrição: '+code);}
   catch{await s.prepare('DELETE FROM registration_mail_checks WHERE account=? AND digest=?').bind(acct.account,hash).run();return json({error:'Não foi possível enviar o código.'},503);}
   return json({ok:true});
  }
@@ -85,7 +87,7 @@ export async function identityAction(req:Request){
 }
 export async function begin(req:Request){
  try{
-  const s=db();if(!(await registrationStatus(s)).open)return failure();
+  const s=db();
   const state=new URL(req.url).searchParams.get('state');if(!state||!hex.test(state))return failure();
   const binder=newVisitorToken();
   const f=await s.prepare("UPDATE registration_identity_flows SET phase='sent',browser=? WHERE state=? AND phase='new' AND expires>? RETURNING *").bind(await digest(binder),state,Date.now()).first<Flow>();
@@ -98,7 +100,7 @@ export async function begin(req:Request){
 export async function complete(req:Request){
  let origin='';
  try{
- const s=db();if(!(await registrationStatus(s)).open)return failure();
+ const s=db();
  const q=req.method==='POST'?new URLSearchParams(await limitedText(req)):new URL(req.url).searchParams;
  const state=q.get('state'),b=(req.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(tag+'='))?.slice(tag.length+1);
  if(!state||!hex.test(state)||!b||!hex.test(b))return failure();

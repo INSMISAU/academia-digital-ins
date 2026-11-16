@@ -20,7 +20,7 @@ const {readFile}=await import('node:fs/promises');
 const {createHash}=await import('node:crypto');
 const original='index-CVCftgiB.css';
 await readFile(path.join('assets',original)); // refuse to emit a broken entry point
-const form=await readFile('components/academy/registration.css');
+const form=Buffer.concat([await readFile('components/academy/registration.css'),Buffer.from('\n'),await readFile('components/academy/account.css')]);
 const fragment='ficha-inscricao-'+createHash('sha256').update(form).digest('hex').slice(0,12)+'.css';
 const doc=await readFile('dist-pages/index.html','utf8');
 const match=/<link rel="stylesheet" crossorigin href="([^"]+\/assets\/)index-[^"]+\.css">/;

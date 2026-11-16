@@ -15,24 +15,37 @@ async function getAcademy(req:Request){try{
  if(u.searchParams.has('course')){
   const c=await course(u.searchParams.get('course')!);
   if(!admin&&c.status!=='publicado')return json({error:'Curso indisponível.'},404);
-  const ls=await all('SELECT * FROM lessons WHERE courseId=? ORDER BY position',c.id);
+  const member=admin||!!key&&!!await one('SELECT id FROM enrollments WHERE courseId=? AND visitorKey=?',c.id,key);
+  const ls=await all(member?'SELECT * FROM lessons WHERE courseId=? ORDER BY position':'SELECT id,courseId,module,title,position FROM lessons WHERE courseId=? ORDER BY position',c.id);
   const qs=await all('SELECT id,prompt,options FROM questions WHERE courseId=?',c.id);
   return json({course:c,lessons:ls,questions:qs.map(q=>({...q,options:JSON.parse(q.options)})),reviews:admin?await all('SELECT * FROM reviews WHERE courseId=? ORDER BY created DESC',c.id):[]});
  }
  const enroll=admin?await all('SELECT * FROM enrollments ORDER BY created DESC'):key?await all('SELECT * FROM enrollments WHERE visitorKey=? ORDER BY created DESC',key):[];
  const strip=(e:any)=>{const {visitorKey,...safe}=e;return safe;};
  return json({isAdmin:admin,validation:inValidation(),courses:await all("SELECT c.*, (SELECT COUNT(*) FROM lessons l WHERE l.courseId=c.id) lessons,(SELECT COUNT(*) FROM questions q WHERE q.courseId=c.id) questions FROM courses c "+(admin?'':"WHERE c.status='publicado' ")+'ORDER BY c.updated DESC'),
- enrollments:await Promise.all(enroll.map(async e=>{const s=await stats(e.id);return {...strip(e),...s,e:strip(s.e),progress:await all('SELECT lessonId,completed FROM progress WHERE enrollmentId=?',e.id),attempts:await all('SELECT id,score,created FROM attempts WHERE enrollmentId=? ORDER BY created DESC',e.id)};})),
+ enrollments:await Promise.all(enroll.map(async e=>{const s=await stats(e.id),preference=await one('SELECT p.*,l.title lastTitle FROM academy_learning_preferences p LEFT JOIN lessons l ON l.id=p.lastLesson WHERE p.enrollmentId=?',e.id);return {...strip(e),...s,e:strip(s.e),archived:!!preference?.archived,lastLesson:preference?.lastLesson||null,lastTitle:preference?.lastTitle||null,visited:preference?.visited||null,progress:await all('SELECT lessonId,completed FROM progress WHERE enrollmentId=?',e.id),attempts:await all('SELECT id,score,created FROM attempts WHERE enrollmentId=? ORDER BY created DESC',e.id)};})),
+ registrations:!admin&&key?await all("SELECT f.reference,f.created,c.id courseId,c.title,c.external FROM academy_registration_forms f JOIN courses c ON c.id=f.courseId WHERE f.owner=? AND c.external IS NOT NULL AND c.status='publicado' ORDER BY f.created DESC",key):[],
  cohorts:admin?await all('SELECT * FROM cohorts ORDER BY starts'):[],
  certificates:await all('SELECT ct.*,e.participant,c.title,c.hours FROM certificates ct JOIN enrollments e ON e.id=ct.enrollmentId JOIN courses c ON c.id=e.courseId '+(admin?'':'WHERE e.visitorKey=? ')+'ORDER BY ct.created DESC',...(admin?[]:[key])),
  media:admin?await all('SELECT * FROM media ORDER BY created DESC'):[],audit:admin?await all('SELECT * FROM audit ORDER BY created DESC LIMIT 100'):[]});
  }catch(e:any){console.error(e);return json({error:'Não foi possível carregar os dados da Academia. Tente novamente.'},503);}}
 async function postAcademy(req:Request){try{if(!permittedOrigin(req))return json({error:'Origem não autorizada.'},403);if(Number(req.headers.get('content-length')||0)>250000)return json({error:'Pedido demasiado grande.'},413);
 const b:any=await req.json();const a=b.action;const admin=isAdmin(req);let token=visitorToken(req),setCookie=false;
-if(!admin&&!['enroll','complete','submit','certificate'].includes(a))return json({error:'Operação reservada à administração.'},403);
-if(['complete','submit','certificate'].includes(a)&&!await ownsEnrollment(req,str(b.enrollmentId)))return json({error:'Percurso indisponível nesta sessão.'},403);
+if(!admin&&!['enroll','complete','submit','certificate','learning_visit','learning_preference'].includes(a))return json({error:'Operação reservada à administração.'},403);
+if(['complete','submit','certificate','learning_visit','learning_preference'].includes(a)&&!await ownsEnrollment(req,str(b.enrollmentId)))return json({error:'Percurso indisponível nesta sessão.'},403);
 let result:any={ok:true};let statements:any[]=[];
-if(a==='seed'){
+if(a==='learning_visit'||a==='learning_preference'){
+ const enrollment=await one('SELECT e.id,c.status FROM enrollments e JOIN courses c ON c.id=e.courseId WHERE e.id=?',b.enrollmentId);
+ if(!enrollment)return json({error:'Inscrição indisponível.'},404);
+ if(a==='learning_visit'){
+  if(enrollment.status!=='publicado')return json({error:'Este curso não está disponível para aprendizagem.'},403);
+  if(!await one('SELECT l.id FROM lessons l JOIN enrollments e ON e.courseId=l.courseId WHERE l.id=? AND e.id=?',str(b.lessonId),b.enrollmentId))return json({error:'Aula indisponível.'},404);
+  statements.push(db().prepare('INSERT INTO academy_learning_preferences(enrollmentId,lastLesson,visited,archived) VALUES(?,?,?,0) ON CONFLICT(enrollmentId) DO UPDATE SET lastLesson=excluded.lastLesson,visited=excluded.visited').bind(b.enrollmentId,b.lessonId,now()));
+ }else{
+  if(typeof b.archived!=='boolean')return json({error:'Preferência inválida.'},422);
+  statements.push(db().prepare('INSERT INTO academy_learning_preferences(enrollmentId,archived) VALUES(?,?) ON CONFLICT(enrollmentId) DO UPDATE SET archived=excluded.archived').bind(b.enrollmentId,b.archived?1:0));
+ }
+}else if(a==='seed'){
  if(await one('SELECT id FROM courses LIMIT 1'))return json({ok:true});
  const t=now();const seeds=[['orientacao','Introdução à Academia Digital','Experimente o percurso completo: estudar, retomar, realizar uma avaliação e obter um certificado de demonstração.','Competências digitais','publicado',1,null],['surtos','Investigação e resposta a surtos','Curso de três módulos e 28 passos. A versão existente continua disponível no seu endereço, enquanto preparamos a integração.','Vigilância epidemiológica','publicado',0,'https://insmisau.github.io/demo-modulo-surtos/'],['biosseguranca','Biossegurança e prevenção de infecções','Proposta de formação. Programa e conteúdos a validar pela equipa pedagógica do INS.','Saúde pública','rascunho',0,null],['dados','Qualidade de dados em saúde','Proposta de formação sobre registo, validação e utilização de dados. Conteúdos ainda em preparação.','Informação em saúde','rascunho',0,null]];
  const selectedSeeds=inValidation()?[['orientacao','Percurso de teste da Academia','Percurso fictício para validar aulas, progresso, avaliação e certificado de demonstração.','Validação da plataforma','publicado',0,null]]:seeds;

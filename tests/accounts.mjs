@@ -1,0 +1,57 @@
+// Isolated D1 and mail double. Never sends email or creates accounts on production.
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+const require=createRequire(import.meta.url),{build}=require('esbuild');
+const {Miniflare,Response:MR}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
+const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'ins-accounts-'));
+const {outputFiles}=await build({stdin:{contents:`import {GET,POST} from './app/api/account/route';import {GET as academy,POST as write} from './app/api/academy/route';import {runValidation} from './db/validation';export default {fetch(r){const u=new URL(r.url),handle=()=>u.pathname.endsWith('/academy')?(r.method==='GET'?academy(r):write(r)):(r.method==='GET'?GET(r):POST(r));return u.pathname.startsWith('/validation/')?runValidation(handle,false):handle();}}`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'neutral',external:['cloudflare:workers','node:async_hooks','node:crypto'],tsconfig:'tsconfig.json'});
+let sent='';const mf=new Miniflare({workers:[{name:'app',modules:true,script:outputFiles[0].text,compatibilityDate:'2026-05-01',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{INS_EMAIL_FROM:'academy@example.invalid'},serviceBindings:{INS_EMAIL:'mail'}},{name:'mail',modules:true,script:`import {WorkerEntrypoint} from 'cloudflare:workers';export default class Mail extends WorkerEntrypoint{async send(m){await this.env.CAPTURE.fetch('https://capture.invalid',{method:'POST',body:m.text});}}`,compatibilityDate:'2026-05-01',serviceBindings:{CAPTURE:async r=>{sent=await r.text();return new MR('ok');}}}]});
+const base='https://unit.invalid',origin='https://insmisau.github.io';let checks=0;
+async function call(route,body,status=200,token,extra={}){const r=await mf.dispatchFetch(base+route,{method:body?'POST':'GET',headers:{Origin:origin,...(body?{'Content-Type':'application/json'}:{}),Authorization:'Bearer '+(token||'a'.repeat(64)),...extra},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));checks++;return d;}
+try{
+ const db=await mf.getD1Database('DB');for(const name of (await fs.readdir('drizzle')).filter(x=>x.endsWith('.sql')).sort())for(const sql of (await fs.readFile('drizzle/'+name,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+ const email='learner@example.invalid',password='Frase longa fictícia de ensaio 123';
+ await call('/api/account',{action:'register',email,password,name:'Fictício'},503);
+ const privacy=JSON.stringify({purpose:'Fictício',controller:'Fictício',access:'Fictício',retention:'Fictício',corrections:'test@example.invalid'});
+ for(const prefix of ['','validation_'])await db.prepare(`INSERT INTO ${prefix}academy_registration_settings(id,enabled,notice,privacy) VALUES(1,1,'',?)`).bind(privacy).run();
+ const info=await call('/api/account'),input={action:'register',name:'Formando fictício',email,password,notice:info.notice,role:'admin',isAdmin:true};
+ await call('/api/account',{...input,password:'curta'},422);
+ const first=await call('/api/account',input,201),other=await call('/api/account',{...input,email:'other@example.invalid'},201);
+ assert(first.session);assert.equal((await call('/api/academy',null,200,first.session)).isAdmin,false);
+ const stored=await db.prepare('SELECT * FROM academy_accounts WHERE email=?').bind(email).first();assert.notEqual(stored.password,password);assert.match(stored.password,/^scrypt:16384:8:5:/);
+ await call('/api/account',{action:'login',email,password:'incorrecta'},401);
+ const login=await call('/api/account',{action:'login',email,password});assert.notEqual(first.session,login.session);
+ assert.equal((await call('/api/account',null,200,login.session)).profile.name,input.name);
+ await db.prepare("INSERT INTO courses(id,title,summary,category,status,hours,pass,version,updated) VALUES('c','Curso','','','publicado',1,80,1,'hoje')").run();
+ await db.prepare("INSERT INTO lessons(id,courseId,module,title,body,position) VALUES('l','c','M','Aula','Conteúdo restrito',0)").run();
+ await db.prepare("INSERT INTO enrollments(id,courseId,participant,province,institution,visitorKey,created) VALUES('e','c','Pessoa','','',?,'hoje')").bind(stored.id).run();
+ assert.equal((await call('/api/academy?course=c')).lessons[0].body,undefined);
+ assert.equal((await call('/api/academy?course=c',null,200,login.session)).lessons[0].body,'Conteúdo restrito');
+ await call('/api/academy',{action:'learning_visit',enrollmentId:'e',lessonId:'l'},200,login.session);
+ assert.equal((await db.prepare('SELECT count(*) n FROM progress').first()).n,0,'A visit must not complete a lesson');
+ await call('/api/academy',{action:'learning_preference',enrollmentId:'e',archived:true},200,login.session);
+ const mine=await call('/api/academy',null,200,login.session);assert.equal(mine.enrollments[0].lastLesson,'l');assert.equal(mine.enrollments[0].archived,true);
+ assert.equal((await call('/api/academy',null,200,other.session)).enrollments.length,0);
+ await call('/api/academy',{action:'learning_visit',enrollmentId:'e',lessonId:'l'},403,other.session);
+ await call('/api/academy',{action:'learning_preference',enrollmentId:'e',archived:false},403,other.session);
+ await call('/api/academy',{action:'course',title:'Ataque'},403,login.session);
+ await call('/api/account',{action:'logout'},200,login.session);assert.equal((await call('/api/account',null,200,login.session)).profile,null);
+ await call('/api/academy',{action:'learning_visit',enrollmentId:'e',lessonId:'l'},403,login.session);
+ await db.prepare('DELETE FROM registration_mail_limits').run();
+ const test=await call('/validation/account',{...input,email:'validation@example.invalid'},201);
+ assert.equal((await call('/api/account',null,200,test.session)).profile,null);
+ assert.equal((await call('/validation/account',null,200,first.session)).profile,null);
+ await call('/validation/account',{...input,email:'name@example.org'},422);
+ await call('/api/account',{action:'recover',email});assert.match(sent,/\d{8}/);const code=sent.match(/\d{8}/)[0];
+ await call('/api/account',{action:'reset',email,code:'111',password},422);
+ const next=password+' novo';await call('/api/account',{action:'reset',email,code,password:next});
+ await call('/api/account',{action:'reset',email,code,password},422);
+ await call('/api/account',{action:'login',email,password},401);
+ await call('/api/account',{action:'login',email,password:next});
+ assert.equal((await call('/api/account',null,200,first.session)).profile,null);
+ await call('/api/account',{action:'login',email,password:next},403,undefined,{Origin:'https://outside.invalid'});
+ console.log('OK: '+checks+' verificações de conta, sessões, recuperação, isolamento, retoma e arquivo em D1 temporária.');
+}finally{await mf.dispose();await fs.rm(tmp,{recursive:true,force:true});}

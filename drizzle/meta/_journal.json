@@ -50,6 +50,13 @@
       "when": 1794810023852,
       "tag": "0006_validacao_ficha",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794813894158,
+      "tag": "0007_contas_percurso",
+      "breakpoints": true
     }
   ]
 }

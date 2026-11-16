@@ -30,7 +30,7 @@ const api=(body,token=owner,endpoint='/identity')=>mf.dispatchFetch(base+endpoin
 let n=0;async function read(response,status){const r=await response,d=await r.json();assert.equal(r.status,status,JSON.stringify(d));n++;return d;}
 try{
  const db=await mf.getD1Database('DB');for(const name of (await fs.readdir('drizzle')).filter(x=>x.endsWith('.sql')).sort())for(const sql of (await fs.readFile('drizzle/'+name,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
- await read(api({action:'start',provider:'google'}),403);
+ await read(api({action:'start',provider:'google'}),200); // Login is independent of open course enrolment.
  await db.prepare("INSERT INTO courses(id,title,summary,category,status,hours,pass,version,updated) VALUES('curso','Curso','','','publicado',1,80,1,'hoje')").run();
  await db.prepare("INSERT INTO academy_registration_settings(id,enabled,notice) VALUES (1,1,'aviso local')").run();
  const privacy=JSON.stringify({purpose:'Ensaio local',controller:'Fictício',access:'Isolado',retention:'Temporário',corrections:'local@example.invalid'});

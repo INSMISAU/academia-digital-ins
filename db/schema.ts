@@ -72,3 +72,14 @@ export const validationRegistrationForms=sqliteTable('validation_academy_registr
  reference:text().primaryKey(),courseId:text().notNull().references(()=>validationCourses.id),owner:text().notNull(),emailKey:text().notNull(),
  payload:text().notNull(),certificateName:text().notNull(),notice:text().notNull(),created:text().notNull(),verifiedContact:text(),
 },t=>[uniqueIndex('validation_registration_owner_course').on(t.owner,t.courseId),uniqueIndex('validation_registration_email_course').on(t.emailKey,t.courseId)]);
+
+export const academyAccounts=sqliteTable('academy_accounts',{id:text().primaryKey(),email:text().notNull().unique(),name:text().notNull(),password:text().notNull(),verified:integer().notNull().default(0),created:text().notNull()});
+export const academyPasswordResets=sqliteTable('academy_password_resets',{account:text().primaryKey(),digest:text().notNull(),expires:integer().notNull(),tries:integer().notNull()});
+export const academyLearningPreferences=sqliteTable('academy_learning_preferences',{enrollmentId:text().primaryKey().references(()=>enrollments.id),lastLesson:text(),visited:text(),archived:integer().notNull().default(0)});
+
+export const validationAcademyAccounts=sqliteTable('validation_academy_accounts',{id:text().primaryKey(),email:text().notNull().unique(),name:text().notNull(),password:text().notNull(),verified:integer().notNull().default(0),created:text().notNull()});
+export const validationAcademyPasswordResets=sqliteTable('validation_academy_password_resets',{account:text().primaryKey(),digest:text().notNull(),expires:integer().notNull(),tries:integer().notNull()});
+export const validationAcademyLearningPreferences=sqliteTable('validation_academy_learning_preferences',{enrollmentId:text().primaryKey().references(()=>validationEnrollments.id),lastLesson:text(),visited:text(),archived:integer().notNull().default(0)});
+export const validationRegistrationSessions=sqliteTable('validation_registration_sessions',{token:text().primaryKey(),account:text().notNull(),name:text().notNull(),email:text().notNull(),trusted:integer().notNull(),expires:integer().notNull()});
+export const validationRegistrationMailLimits=sqliteTable('validation_registration_mail_limits',{bucket:text().primaryKey(),until:integer().notNull(),count:integer().notNull()});
+export const validationRegistrationMailChecks=sqliteTable('validation_registration_mail_checks',{account:text().primaryKey(),email:text().notNull(),digest:text().notNull(),tries:integer().notNull(),expires:integer().notNull(),confirmed:integer().notNull().default(0)});

@@ -69,7 +69,7 @@ export function EbookResource() {
       <div className="academy-course-type">eBook</div>
       <h3>{academyEbook.title}</h3>
       <p>Material de consulta</p>
-      <div className="academy-course-actions"><a className="button-link" href={academyEbook.url}>Consultar eBook<ArrowRight size={15}/></a></div>
+      <div className="academy-course-actions"><a className="button-link" href={academyEbook.url} target="_blank" rel="noopener noreferrer">Consultar eBook<ArrowRight size={15}/></a></div>
     </div>
   </article>;
 }
