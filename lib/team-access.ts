@@ -1,3 +1,5 @@
+import {log} from '@/db/store';
+import {runActor} from '@/db/actor';
 import {env} from 'cloudflare:workers';
 import {withPagesCors} from './academy-cors';
 import {runAdministration} from '@/db/administration';
@@ -21,7 +23,8 @@ export function withTeam(req:Request,handle:()=>Promise<Response>,validation=fal
  return withPagesCors(req,async()=>{
   const access=await teamAccess(req);
   if(!access&&!isAdmin(req))return Response.json({error:'Acesso reservado à equipa técnica. Utilize a sua ligação privada.'},{status:401,headers:{'Cache-Control':'no-store'}});
-  return validation?runValidation(handle,req.headers.get('X-Academy-Mode')!=='participant'):runAdministration(handle);
+  const traced=async()=>{const response=await handle();if(req.method==='GET'&&req.headers.get('X-Academy-Mode')!=='participant')await log('Consultar administração',new URL(req.url).pathname,response.ok?'Consulta autorizada':'Consulta recusada',response.ok?'permitido':'negado').run();return response;};
+  return runActor(access?'technical:'+access.id:'site-owner','',()=>validation?runValidation(traced,req.headers.get('X-Academy-Mode')!=='participant'):runAdministration(traced));
  });
 }
 

@@ -1,3 +1,5 @@
+import {roleGrants} from './academy-roles';
+import {mfaInfo} from './academy-mfa';
 import {db} from '@/db/store';
 import {visitorToken,newVisitorToken} from '@/db/access';
 import {inValidation} from '@/db/validation';
@@ -10,7 +12,8 @@ import {permittedOrigin} from './academy-cors';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const emailValid=(s:unknown):s is string=>typeof s==='string'&&s.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 async function limit(bucket:string,maximum:number,period:number){const time=Date.now();return !!await db().prepare('INSERT INTO registration_mail_limits(bucket,until,count) VALUES(?,?,1) ON CONFLICT(bucket) DO UPDATE SET count=CASE WHEN until<=? THEN 1 ELSE count+1 END,until=CASE WHEN until<=? THEN excluded.until ELSE until END WHERE until<=? OR count<? RETURNING count').bind(bucket,time+period,time,time,time,maximum).first();}
-export async function accountProfile(req:Request){const token=visitorToken(req);if(!token)return null;return db().prepare('SELECT account,name,email,trusted FROM registration_sessions WHERE token=? AND expires>?').bind(await digest(token),Date.now()).first<{account:string;name:string;email:string;trusted:number}>();}
+export {accountProfile} from './academy-profile';
+import {accountProfile} from './academy-profile';
 async function newSession(account:{id:string;name:string;email:string;verified:number}){
  const session=externalPrefix+newVisitorToken().slice(externalPrefix.length);
  await db().prepare('INSERT INTO registration_sessions(token,account,name,email,trusted,expires) VALUES(?,?,?,?,?,?)').bind(await digest(session),account.id,account.name,account.email,account.verified,Date.now()+8*3600000).run();
@@ -19,13 +22,13 @@ async function newSession(account:{id:string;name:string;email:string;verified:n
 export async function getAccount(req:Request){try{
  const profile=await accountProfile(req),state=await registrationStatus(db());
  const owner=profile?'':await keyFor(visitorToken(req)),hasManualLearning=!!owner&&!!await db().prepare('SELECT 1 FROM enrollments WHERE visitorKey=? UNION ALL SELECT 1 FROM academy_registration_forms WHERE owner=? LIMIT 1').bind(owner,owner).first();
- return reply({hasManualLearning,profile:profile?{name:profile.name,email:profile.email,verified:!!profile.trusted}:null,registrationOpen:state.open,notice:state.notice,providers:inValidation()?[]:enabledProviders(),recoveryAvailable:mailAvailable()&&!inValidation()});
+ return reply({management:profile&&await roleGrants(profile.account).then(g=>g.length>0)?await mfaInfo(req,profile.account):null,hasManualLearning,profile:profile?{name:profile.name,email:profile.email,verified:!!profile.trusted}:null,registrationOpen:state.open,notice:state.notice,providers:inValidation()?[]:enabledProviders(),recoveryAvailable:mailAvailable()&&!inValidation()});
 }catch{return reply({error:'Não foi possível consultar a conta. Tente novamente.'},503);}}
 export async function postAccount(req:Request){try{
  if(!permittedOrigin(req)||!req.headers.get('Content-Type')?.startsWith('application/json'))return reply({error:'Pedido não autorizado.'},403);
  const input=JSON.parse(await limitedText(req,4096)),s=db();
  if(input.action==='logout'){
-  const token=visitorToken(req);if(token)await s.prepare('DELETE FROM registration_sessions WHERE token=?').bind(await digest(token)).run();return reply({ok:true});
+  const token=visitorToken(req);if(token){const hash=await digest(token);await s.batch([s.prepare('DELETE FROM academy_mfa_sessions WHERE token=?').bind(hash),s.prepare('DELETE FROM registration_sessions WHERE token=?').bind(hash)]);}return reply({ok:true});
  }
  if(!emailValid(input.email))return reply({error:'Indique um endereço de email válido.'},422);
  const email=input.email.trim().toLowerCase(),ip=req.headers.get('CF-Connecting-IP')||'unknown';

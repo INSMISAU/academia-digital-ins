@@ -9,7 +9,7 @@ export const attempts=sqliteTable('attempts',{id:text().primaryKey(),enrollmentI
 export const certificates=sqliteTable('certificates',{id:text().primaryKey(),enrollmentId:text().notNull().unique().references(()=>enrollments.id),code:text().notNull().unique(),status:text().notNull().default('valido'),version:integer().notNull(),created:text().notNull()});
 export const cohorts=sqliteTable('cohorts',{id:text().primaryKey(),courseId:text().notNull().references(()=>courses.id),title:text().notNull(),trainer:text().notNull(),starts:text().notNull(),ends:text().notNull(),capacity:integer().notNull()});
 export const media=sqliteTable('media',{id:text().primaryKey(),name:text().notNull(),type:text().notNull(),size:integer().notNull(),created:text().notNull()});
-export const audit=sqliteTable('audit',{id:text().primaryKey(),action:text().notNull(),entity:text().notNull(),detail:text().notNull(),created:text().notNull()});
+export const audit=sqliteTable('audit',{actor:text().notNull().default(''),institution:text().notNull().default(''),result:text().notNull().default('permitido'),id:text().primaryKey(),action:text().notNull(),entity:text().notNull(),detail:text().notNull(),created:text().notNull()});
 export const reviews=sqliteTable('reviews',{id:text().primaryKey(),courseId:text().notNull().references(()=>courses.id),comment:text().notNull(),decision:text().notNull(),created:text().notNull()});
 export const snapshots=sqliteTable('snapshots',{id:text().primaryKey(),courseId:text().notNull().references(()=>courses.id),version:integer().notNull(),content:text().notNull(),created:text().notNull()});
 
@@ -23,7 +23,7 @@ export const validationAttempts=sqliteTable('validation_attempts',{id:text().pri
 export const validationCertificates=sqliteTable('validation_certificates',{id:text().primaryKey(),enrollmentId:text().notNull().unique().references(()=>validationEnrollments.id),code:text().notNull().unique(),status:text().notNull().default('valido'),version:integer().notNull(),created:text().notNull()});
 export const validationCohorts=sqliteTable('validation_cohorts',{id:text().primaryKey(),courseId:text().notNull().references(()=>validationCourses.id),title:text().notNull(),trainer:text().notNull(),starts:text().notNull(),ends:text().notNull(),capacity:integer().notNull()});
 export const validationMedia=sqliteTable('validation_media',{id:text().primaryKey(),name:text().notNull(),type:text().notNull(),size:integer().notNull(),created:text().notNull()});
-export const validationAudit=sqliteTable('validation_audit',{id:text().primaryKey(),action:text().notNull(),entity:text().notNull(),detail:text().notNull(),created:text().notNull()});
+export const validationAudit=sqliteTable('validation_audit',{actor:text().notNull().default(''),institution:text().notNull().default(''),result:text().notNull().default('permitido'),id:text().primaryKey(),action:text().notNull(),entity:text().notNull(),detail:text().notNull(),created:text().notNull()});
 export const validationReviews=sqliteTable('validation_reviews',{id:text().primaryKey(),courseId:text().notNull().references(()=>validationCourses.id),comment:text().notNull(),decision:text().notNull(),created:text().notNull()});
 export const validationSnapshots=sqliteTable('validation_snapshots',{id:text().primaryKey(),courseId:text().notNull().references(()=>validationCourses.id),version:integer().notNull(),content:text().notNull(),created:text().notNull()});
 
@@ -83,3 +83,17 @@ export const validationAcademyLearningPreferences=sqliteTable('validation_academ
 export const validationRegistrationSessions=sqliteTable('validation_registration_sessions',{token:text().primaryKey(),account:text().notNull(),name:text().notNull(),email:text().notNull(),trusted:integer().notNull(),expires:integer().notNull()});
 export const validationRegistrationMailLimits=sqliteTable('validation_registration_mail_limits',{bucket:text().primaryKey(),until:integer().notNull(),count:integer().notNull()});
 export const validationRegistrationMailChecks=sqliteTable('validation_registration_mail_checks',{account:text().primaryKey(),email:text().notNull(),digest:text().notNull(),tries:integer().notNull(),expires:integer().notNull(),confirmed:integer().notNull().default(0)});
+
+// Access is granted explicitly. Legacy records keep no inferred institution.
+export const academyInstitutions=sqliteTable('academy_institutions',{id:text().primaryKey(),name:text().notNull(),created:text().notNull()});
+export const academyRoles=sqliteTable('academy_roles',{id:text().primaryKey(),account:text().notNull(),role:text().notNull(),institutionId:text().notNull().default(''),courseId:text().notNull().default(''),cohortId:text().notNull().default(''),canPublish:integer().notNull().default(0),created:text().notNull(),actor:text().notNull()},t=>[index('academy_roles_account').on(t.account)]);
+export const academyResourceScopes=sqliteTable('academy_resource_scopes',{kind:text().notNull(),resourceId:text().notNull(),institutionId:text().notNull().default(''),ownerAccount:text().notNull().default(''),courseId:text().notNull().default('')},t=>[primaryKey({columns:[t.kind,t.resourceId]})]);
+export const academyMfa=sqliteTable('academy_mfa',{account:text().primaryKey(),cipher:text().notNull(),enabled:integer().notNull().default(0),lastStep:integer().notNull().default(-1),expires:integer().notNull()});
+export const academyMfaSessions=sqliteTable('academy_mfa_sessions',{token:text().primaryKey(),account:text().notNull(),expires:integer().notNull()});
+
+// Access is granted explicitly. Legacy records keep no inferred institution.
+export const validationAcademyInstitutions=sqliteTable('validation_academy_institutions',{id:text().primaryKey(),name:text().notNull(),created:text().notNull()});
+export const validationAcademyRoles=sqliteTable('validation_academy_roles',{id:text().primaryKey(),account:text().notNull(),role:text().notNull(),institutionId:text().notNull().default(''),courseId:text().notNull().default(''),cohortId:text().notNull().default(''),canPublish:integer().notNull().default(0),created:text().notNull(),actor:text().notNull()},t=>[index('validation_academy_roles_account').on(t.account)]);
+export const validationAcademyResourceScopes=sqliteTable('validation_academy_resource_scopes',{kind:text().notNull(),resourceId:text().notNull(),institutionId:text().notNull().default(''),ownerAccount:text().notNull().default(''),courseId:text().notNull().default('')},t=>[primaryKey({columns:[t.kind,t.resourceId]})]);
+export const validationAcademyMfa=sqliteTable('validation_academy_mfa',{account:text().primaryKey(),cipher:text().notNull(),enabled:integer().notNull().default(0),lastStep:integer().notNull().default(-1),expires:integer().notNull()});
+export const validationAcademyMfaSessions=sqliteTable('validation_academy_mfa_sessions',{token:text().primaryKey(),account:text().notNull(),expires:integer().notNull()});

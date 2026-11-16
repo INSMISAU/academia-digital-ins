@@ -1,3 +1,4 @@
+import {auditActor} from './actor';
 import { env } from 'cloudflare:workers';
 import {inValidation,validationSql} from './validation';
 export function db(){
@@ -10,6 +11,6 @@ export function db(){
 }
 export const now=()=>new Date().toISOString();
 export const uid=()=>crypto.randomUUID();
-export function log(action:string,entity:string,detail:string){return db().prepare('INSERT INTO audit (id,action,entity,detail,created) VALUES (?,?,?,?,?)').bind(uid(),action,entity,detail,now());}
+export function log(action:string,entity:string,detail:string,result='permitido'){const actor=auditActor();return db().prepare('INSERT INTO audit (id,action,entity,detail,created,actor,institution,result) VALUES (?,?,?,?,?,?,?,?)').bind(uid(),action,entity,detail,now(),actor.id,actor.institution,result);}
 export async function all(sql:string,...args:any[]){return (await db().prepare(sql).bind(...args).all()).results as any[];}
 export async function one(sql:string,...args:any[]){return await db().prepare(sql).bind(...args).first() as any;}

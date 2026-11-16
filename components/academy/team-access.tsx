@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState,type ReactNode} from 'react';
-import {academyAdministration,academyValidation,academyReadJson,academyFetch,setTeamAccess,clearTeamAccess,beginParticipant,participantScope,hasExternalSession} from '@/lib/academy-client';
+import {academyAdministration,academyValidation,academyReadJson,academyFetch,setTeamAccess,clearTeamAccess,beginParticipant,participantScope,hasExternalSession,academyManagement} from '@/lib/academy-client';
 
 export function TeamGate({children}:{children:ReactNode}){
  const [ready,setReady]=useState(false),[error,setError]=useState('');
@@ -18,7 +18,7 @@ export function TeamGate({children}:{children:ReactNode}){
       const response=await academyFetch('/api/team-access',{method:'POST'});
       if(!response.ok)throw Error(((await response.json()) as {error?:string}).error||'Não foi possível abrir os testes internos.');
       // Test identities never resume a real participant's external account.
-      if(!participantScope()||hasExternalSession())beginParticipant();
+      if(!participantScope()||hasExternalSession()&&!academyManagement()&&new URLSearchParams(location.search).get('perfil')!=='participante')beginParticipant();
      }
     }
     if(active)setReady(true);

@@ -1,3 +1,5 @@
+import {runActor,auditActor} from '@/db/actor';
+import {visitorKey,visitorToken,isAdmin} from '@/db/access';
 export const pagesOrigin = 'https://insmisau.github.io';
 
 export function permittedOrigin(req: Request) {
@@ -11,7 +13,9 @@ export async function withPagesCors(req: Request, handle: () => Promise<Response
   if (origin === pagesOrigin && !/^Bearer [a-f0-9]{64}$/.test(req.headers.get('Authorization') || '')) {
     return corsHeaders(Response.json({error: 'Não foi possível recuperar a sessão. Recarregue a página.'}, {status: 401}));
   }
-  const response = await handle();
+  const owner=auditActor().id?'':await visitorKey(visitorToken(req));
+  const actor=isAdmin(req)?'site-owner':owner.startsWith('account:')?owner:owner?'visitor:'+owner.slice(0,16):'';
+  const response = auditActor().id?await handle():await runActor(actor,'',handle);
   return origin === pagesOrigin ? corsHeaders(response) : response;
 }
 

@@ -5,19 +5,20 @@ import {Input} from '@/components/ui/input';
 import {academyFetch,academyReadJson,beginParticipant,setParticipantSession,academyValidation} from '@/lib/academy-client';
 import {startAccess,methods,type Method} from '@/lib/registration-client';
 import './account.css';
+import {ManagementAccess} from './mfa';
 export async function accountAction(body:Record<string,unknown>){const response=await academyFetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await response.json() as any;if(!response.ok)throw Error(data.error||'Não foi possível concluir.');return data;}
 export function AccountPanel({navigate,changed}:{navigate:(view:string)=>void;changed:()=>Promise<unknown>}){
  const [data,setData]=useState<any>(null),[mode,setMode]=useState('login'),[name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[code,setCode]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{let live=true;academyReadJson('/api/account').then(d=>{if(live)setData(d);}).catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[]);
  async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setMessage('');try{
   const result=await accountAction({action:mode,name,email,password,code,notice:data.notice});
-  setPassword('');if(result.session){beginParticipant();setParticipantSession(result.session);await changed();setData({...data,profile:result.profile});navigate('aprender');}
+  setPassword('');if(result.session){beginParticipant();setParticipantSession(result.session);await changed();setData(await academyReadJson('/api/account'));navigate('aprender');}
   else if(mode==='recover'){setMode('reset');setMessage(result.message);}
   else if(mode==='reset'){setMode('login');setMessage('Palavra-passe actualizada. Entre com a nova palavra-passe.');setCode('');}
  }catch(e){setError(e instanceof Error?e.message:'Não foi possível concluir.');}finally{setBusy(false);}}
  async function logout(){setBusy(true);setError('');try{await accountAction({action:'logout'});beginParticipant();setData(null);await changed();setData(await academyReadJson('/api/account'));setMode('login');setPassword('');setEmail('');}catch(e){setError(e instanceof Error?e.message:'Não foi possível terminar a sessão.');}finally{setBusy(false);}}
  return <section className="academy-account"><div className="page-heading"><div><span className="eyebrow">ACADEMIA DIGITAL DO INS</span><h1>{data?.profile?'Meu perfil':mode==='register'?'Criar conta':mode==='recover'||mode==='reset'?'Recuperar acesso':'Entrar'}</h1></div></div>{error&&<p role="alert" className="editor-error">{error}</p>}{message&&<p role="status">{message}</p>}{!data&&!error&&<p role="status">A carregar…</p>}
- {data?.profile?<div className="panel form"><h2>{data.profile.name}</h2><p>{data.profile.email}</p><div className="row wrap"><Button onClick={()=>navigate('aprender')}>Meus cursos</Button><Button variant="outline" onClick={()=>navigate('certificados')}>Meus certificados</Button><Button variant="outline" disabled={busy} onClick={()=>void logout()}>Terminar sessão</Button></div></div>:data&&<div className="panel form">
+ {data?.profile?<div className="panel form"><h2>{data.profile.name}</h2><p>{data.profile.email}</p><div className="row wrap"><Button onClick={()=>navigate('aprender')}>Meus cursos</Button><Button variant="outline" onClick={()=>navigate('certificados')}>Meus certificados</Button><Button variant="outline" disabled={busy} onClick={()=>void logout()}>Terminar sessão</Button></div>{data.management&&<ManagementAccess initial={data.management}/>}</div>:data&&<div className="panel form">
  {data.hasManualLearning&&<Button variant="outline" onClick={()=>navigate('aprender')}>Meus cursos neste acesso</Button>}
  {(mode==='login'||mode==='register')&&<div className="row wrap"><Button variant={mode==='login'?'default':'outline'} onClick={()=>{setMode('login');setError('');}}>Entrar</Button><Button variant={mode==='register'?'default':'outline'} onClick={()=>{setMode('register');setError('');}}>Criar conta</Button></div>}
  {mode==='register'&&!data.registrationOpen?<p>A criação de contas está temporariamente indisponível.</p>:<form className="form" onSubmit={submit}>

@@ -1,3 +1,5 @@
+import {auditActor} from '@/db/actor';
+import {scopeStatements,roleContext} from '@/lib/academy-roles';
 import {withPagesCors,pagesPreflight,permittedOrigin} from '@/lib/academy-cors';
 import {isAdmin,ownsEnrollment} from '@/db/access';
 import {db,all,one,now,uid,log} from '@/db/store';
@@ -115,7 +117,7 @@ async function write(req:Request){
   if(!expired&&snap.questions.some((q:Question)=>!Object.hasOwn(finalAnswers,q.id)||(q.type==='curta'&&!String(finalAnswers[q.id]).trim())||(q.type==='multipla'&&!finalAnswers[q.id].length)))fail('Responda a todas as questões antes de submeter.');
   const result=gradeQuestions(snap.questions,finalAnswers),submitted=now();const statements=[db().prepare("UPDATE academy_assessment_runs SET state='submitted',answers=?,review=?,score=?,submitted=? WHERE id=? AND state='active'").bind(JSON.stringify(finalAnswers),JSON.stringify({questions:result.review,expired}),result.score,submitted,r.id)];
   if(r.stage==='pos')statements.push(db().prepare('INSERT OR IGNORE INTO attempts (id,enrollmentId,score,answers,created) VALUES (?,?,?,?,?)').bind(r.id,r.enrollmentId,result.score,JSON.stringify(finalAnswers),submitted));
-  statements.push(db().prepare('INSERT INTO audit (id,action,entity,detail,created) SELECT ?,?,?,?,? WHERE changes()>0').bind(uid(),r.stage==='pre'?'Submeter pré-teste':'Submeter pós-teste',r.enrollmentId,result.score+'%',submitted));await db().batch(statements);return json(runView(await one('SELECT * FROM academy_assessment_runs WHERE id=?',r.id)));
+  statements.push(db().prepare('INSERT INTO audit (id,action,entity,detail,created,actor,institution) SELECT ?,?,?,?,?,?,? WHERE changes()>0').bind(uid(),r.stage==='pre'?'Submeter pré-teste':'Submeter pós-teste',r.enrollmentId,result.score+'%',submitted,auditActor().id,auditActor().institution));await db().batch(statements);return json(runView(await one('SELECT * FROM academy_assessment_runs WHERE id=?',r.id)));
  }
  if(!admin)fail('Operação reservada à administração.',403);
  if(a==='entry'){
@@ -132,7 +134,7 @@ async function write(req:Request){
   const statements=[];
   statements.push(db().prepare('INSERT OR IGNORE INTO academy_entry_history (entryId,revision,payload,created) SELECT id,revision,?,? FROM academy_entries WHERE id=? AND revision=?').bind(old?JSON.stringify(unpack(old)):'',t,id,revision));
   statements.push(db().prepare('INSERT INTO academy_entries (id,kind,title,status,payload,revision,created,updated) VALUES (?,?,?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,status=excluded.status,payload=excluded.payload,revision=academy_entries.revision+1,updated=excluded.updated WHERE academy_entries.revision=? AND academy_entries.kind=excluded.kind').bind(id,kind,title,status,payload,t,t,revision));
-  const result=await db().batch(statements);if(!result[1].meta.changes)fail('O registo foi alterado noutra sessão. Reabra-o antes de guardar.',409);
+  statements.push(...scopeStatements('entry',id,kind==='curso'?id:body.courseId||''));const result=await db().batch(statements);if(!result[1].meta.changes)fail('O registo foi alterado noutra sessão. Reabra-o antes de guardar.',409);
   if(kind==='modulo'&&old&&old.title!==title)await db().prepare('UPDATE lessons SET module=? WHERE courseId=? AND module=?').bind(title,body.courseId,old.title).run();
   await db().batch([log('Guardar '+kind,id,title)]);return json({entry:await entry(id)});
  }
@@ -144,7 +146,7 @@ async function write(req:Request){
   const c=await course(str(b.courseId,100));if(c.status!=='publicado'||c.external)fail('Seleccione um curso interno publicado.');
   if(!Array.isArray(b.rows)||!b.rows.length||b.rows.length>500)fail('Importe entre 1 e 500 participantes.');
   const rows=b.rows.map((r:any)=>({participant:str(r.nome,100),province:str(r.provincia,100),institution:str(r.instituicao,200,true)}));if(rows.some((r:any)=>!provinces.includes(r.province)))fail('Indique uma província válida em todas as linhas.');
-  const statements=rows.map((r:any)=>db().prepare('INSERT OR IGNORE INTO enrollments (id,courseId,participant,province,institution,created) VALUES (?,?,?,?,?,?)').bind(uid(),c.id,r.participant,r.province,r.institution,now()));const result=await db().batch(statements);const added=result.reduce((n,r)=>n+r.meta.changes,0);await db().batch([log('Importar inscrições',c.id,added+' inscrições novas; duplicados preservados sem repetição')]);return json({added,skipped:rows.length-added});
+  const statements=rows.flatMap((r:any)=>{const id=uid();return [db().prepare('INSERT OR IGNORE INTO enrollments (id,courseId,participant,province,institution,created) VALUES (?,?,?,?,?,?)').bind(id,c.id,r.participant,r.province,r.institution,now()),...scopeStatements('enrollment',id,c.id).map(()=>db().prepare("INSERT OR IGNORE INTO academy_resource_scopes(kind,resourceId,institutionId,ownerAccount,courseId) SELECT 'enrollment',id,?,?,courseId FROM enrollments WHERE id=?").bind(roleContext()?.creationInstitution||'',roleContext()?.account||'',id))];});const result=await db().batch(statements);const added=result.filter((_,i)=>!roleContext()||i%2===0).reduce((n,r)=>n+r.meta.changes,0);await db().batch([log('Importar inscrições',c.id,added+' inscrições novas; duplicados preservados sem repetição')]);return json({added,skipped:rows.length-added});
  }
  if(a==='cohort_member'){
   const cohortId=str(b.cohortId,100),enrollmentId=str(b.enrollmentId,100);const c=await one('SELECT * FROM cohorts WHERE id=?',cohortId),e=await one('SELECT * FROM enrollments WHERE id=?',enrollmentId);if(!c||!e||c.courseId!==e.courseId)fail('A inscrição deve pertencer ao curso desta turma.');

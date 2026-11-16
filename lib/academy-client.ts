@@ -44,7 +44,10 @@ export function setParticipantSession(token:string){
  activeParticipant={token,expires:Date.now()+(token.startsWith('a0ce5510ade0')?8*3600000:lifetime)};
  try{sessionStorage.setItem(participantKey(),JSON.stringify(activeParticipant));}catch{}
 }
+let managementInstitution='';
+export function setManagementInstitution(id:string){managementInstitution=id;}
 export function beginParticipant(){
+ setManagementInstitution('');
  const token=academyRequestId()+academyRequestId();
  // New tabs must not recover the previous participant through the legacy browser-wide token.
  if(!academyValidation()){
@@ -59,6 +62,7 @@ export const participantScope=()=>currentParticipant();
 export function academyAdministration() {
   return typeof location !== 'undefined' && new URLSearchParams(location.search).get('administracao')==='1';
 }
+export function academyManagement(){return typeof location!=='undefined'&&new URLSearchParams(location.search).get('gestao')==='1';}
 export function academyValidation(){return typeof location!=='undefined'&&new URLSearchParams(location.search).get('validacao')==='1';}
 export function academyParticipantTest(){return academyValidation()&&new URLSearchParams(location.search).get('perfil')==='participante';}
 const teamKey='ins-ologatecnica-access-v1';
@@ -67,6 +71,7 @@ export function clearTeamAccess(){sessionStorage.removeItem(teamKey);beginPartic
 function teamToken(){try{return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
 export function academyUrl(path: string) {
   if (path.startsWith('/api/')&&!path.startsWith('/api/team-access')) {
+    if(academyManagement()&&(/^\/api\/(academy|workspace|media|certificate|resource|export)(\/|\?|$)/.test(path)||path.startsWith('/api/registration/settings')))path='/api/management/'+path.slice(5);
     if(academyValidation())path='/api/validation/'+path.slice(5);
     else if(academyAdministration())path='/api/administration/'+path.slice(5);
   }
@@ -77,11 +82,12 @@ export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins
 
 // Keep the technical access in the same tab and origin as its private capability.
 export function academyAdministrationUrl(_isAdmin?: boolean) {
-  return '?administracao=1#gestao';
+  return academyManagement()?'?gestao=1#gestao':'?administracao=1#gestao';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
+  if(academyManagement()&&typeof init.body==='string'&&headers.get('Content-Type')?.includes('application/json')){if(managementInstitution){const body=JSON.parse(init.body);if(!body.institutionId)init={...init,body:JSON.stringify({...body,institutionId:managementInstitution})};}}
   const active=academyAdministration()?'':currentParticipant();
   if (active||academyOrigin||academyValidation()) headers.set('Authorization', 'Bearer ' + (active||sessionToken()));
   if(path.startsWith('/api/team-access')||academyAdministration()||academyValidation()){
