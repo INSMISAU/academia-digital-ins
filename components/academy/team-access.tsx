@@ -51,5 +51,5 @@ export function TeamGate({children}:{children:ReactNode}){
 
 export function TeamBar(){
  if(!academyAdministration()&&!academyValidation()&&!hasTeamAccess())return null;
- return <aside className="ins-team-bar" aria-label="Navegação da administração"><strong>{academyValidation()?'Validação':'Administração'}</strong><nav><a href="?administracao=1#painel">Administrar Academia</a>{academyValidation()?<><a href="?validacao=1#painel">Gestão</a><a href="?validacao=1&perfil=participante#catalogo">Área do participante</a></>:<a href="?">Academia</a>}<button onClick={clearTeamAccess}>Sair</button></nav></aside>;
+ return <aside className="ins-team-bar" aria-label="Navegação da administração"><strong>{academyValidation()?'Validação':'Administração'}</strong><nav>{academyValidation()&&<><a href="?validacao=1#painel">Gestão</a><a href="?validacao=1&perfil=participante#catalogo">Área do participante</a></>}<a href="?">Voltar à Academia</a><button onClick={clearTeamAccess}>Sair</button></nav></aside>;
 }
