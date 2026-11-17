@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  manifest: "/manifest.webmanifest",
   title: "Academia Digital do INS",
   description: "Formação, aprendizagem e gestão institucional.",
   icons: {

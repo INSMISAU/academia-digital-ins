@@ -28,7 +28,6 @@ export function courseOverview(raw: unknown): CourseOverview {
 }
 export function encodeOverview(input: CourseOverview): string {
   const data = Object.fromEntries(Object.keys(emptyOverview).map(k => [k, string(input[k as keyof CourseOverview]).trim()])) as CourseOverview;
-  if (!data.summary) throw Error('Preencha o resumo do curso.');
   if (data.modality && !modalities.includes(data.modality)) throw Error('Seleccione uma modalidade válida.');
   const encoded = Object.entries(data).some(([key, value]) => key !== 'summary' && value) ? COURSE_FORMAT + JSON.stringify(data) : data.summary;
   if (encoded.length > 30000) throw Error('Reduza o texto da ficha: o conjunto dos campos deve caber em 30000 caracteres.');

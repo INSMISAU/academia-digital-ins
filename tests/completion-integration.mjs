@@ -1,0 +1,63 @@
+// All mutations below run in a fresh temporary D1/R2. No production data or outbound mail.
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import fs from 'node:fs';
+import {zipSync,strToU8} from 'fflate';
+const require=createRequire(import.meta.url),{Miniflare}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
+const paths=fs.readdirSync('dist/server',{recursive:true});
+const mf=new Miniflare({modules:[{type:'ESModule',path:'dist/server/index.js'},...paths.filter(p=>p.endsWith('.js')&&p!=='index.js').map(p=>({type:'ESModule',path:'dist/server/'+p})),...paths.filter(p=>p.endsWith('.wasm')).map(p=>({type:'CompiledWasm',path:'dist/server/'+p}))],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['BUCKET'],cf:false,bindings:{INS_SCHEDULER_SECRET:'local-test-secret-long-enough-123456'}});
+const owner={'oai-authenticated-user-id':'qa-owner','oai-authenticated-user-email':'perciliamuianga@gmail.com'},origin='http://academy.test';let checks=0;
+async function call(path,body,headers=owner,status=200){let formHeaders={};if(body instanceof FormData){const encoded=new Request(origin,{method:'POST',body});formHeaders={'Content-Type':encoded.headers.get('Content-Type')};body=Buffer.from(await encoded.arrayBuffer());}const r=await mf.dispatchFetch(origin+path,{headers:{Origin:origin,...headers,...(body&&!Buffer.isBuffer(body)?{'Content-Type':'application/json'}:{}),...formHeaders},...(body?{method:'POST',body:Buffer.isBuffer(body)?body:JSON.stringify(body)}:{})});const raw=await r.text();assert.equal(r.status,status,raw.slice(0,800));checks++;try{return JSON.parse(raw);}catch{return raw;}}
+const work=b=>call('/api/workspace',b),api=b=>call('/api/completion',b),academy=b=>call('/api/academy',b);
+try{
+ const db=await mf.getD1Database('DB');for(const name of fs.readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort())for(const sql of fs.readFileSync('drizzle/'+name,'utf8').split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+ const c=await academy({action:'course',title:'Curso QA',summary:'',category:'',hours:2,pass:80});assert(c.id);checks++;
+ await call('/api/academy',{action:'transition',id:c.id,status:'em_revisao',comment:'QA'},owner,400);
+ await academy({action:'course',id:c.id,title:'Curso QA',summary:'Resumo',category:'QA',hours:2,pass:80});
+ await academy({action:'lesson',courseId:c.id,title:'Aula QA',module:'Módulo QA',body:'Conteúdo QA'});
+ const lesson=(await call('/api/academy?course='+c.id)).lessons[0];
+ const task=(await work({action:'entry',kind:'tarefa',title:'Trabalho QA',status:'publicado',body:{courseId:c.id,required:true,pass:60,weight:100,allowFile:true}})).entry;
+ await academy({action:'question',courseId:c.id,prompt:'QA?',options:['A','B'],answer:0,explanation:'QA'});
+ for(const state of ['em_revisao','aprovado','publicado'])await academy({action:'transition',id:c.id,status:state,comment:'QA'});
+ const aToken='a0ce5510ade0'+'1'.repeat(52),bToken='a0ce5510ade0'+'2'.repeat(52),digest=async s=>Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))).toString('hex');
+ for(const [token,id]of[[aToken,'qa-a'],[bToken,'qa-b']]){await db.prepare('INSERT INTO registration_sessions(token,account,name,email,trusted,expires) VALUES(?,?,?,?,1,?)').bind(await digest(token),id,id,id+'@example.invalid',Date.now()+3600000).run();await db.prepare('INSERT INTO enrollments(id,courseId,participant,province,institution,created,visitorKey) VALUES(?,?,?,?,?,?,?)').bind('enroll-'+id,c.id,id,'','','2026-11-17T10:00:00.000Z',id).run();}
+ const a={Authorization:'Bearer '+aToken},b={Authorization:'Bearer '+bToken};
+ await call('/api/completion',{action:'assignment_submit',courseId:c.id,assignmentId:task.id,content:'Resposta A',revision:0},a);
+ let entries=await call('/api/completion?course='+c.id,null,a);assert.equal(entries.submissions[0].body,'Resposta A');checks++;
+ assert.equal((await call('/api/completion?course='+c.id,null,b)).submissions.length,0);checks++;
+ await call('/api/completion',{action:'assignment_grade',id:entries.submissions[0].id,revision:1,score:70},b,403);
+ await api({action:'assignment_grade',id:entries.submissions[0].id,revision:1,score:70,feedback:'Comentário QA'});
+ await call('/api/completion',{action:'assignment_submit',courseId:c.id,assignmentId:task.id,content:'Alteração após nota',revision:2},a,400);
+ await call('/api/completion',{action:'discussion_post',courseId:c.id,content:'Discussão QA'},a);assert((await call('/api/completion?course='+c.id,null,b)).discussions.some(d=>d.content==='Discussão QA'));checks++;
+ await call('/api/completion',{action:'study_ping',courseId:c.id,lessonId:lesson.id,session:'tab-a'},a);await db.prepare('UPDATE academy_study_time SET lastSeen=? WHERE enrollmentId=?').bind(Date.now()-15000,'enroll-qa-a').run();await call('/api/completion',{action:'study_ping',courseId:c.id,lessonId:lesson.id,session:'tab-a'},a);assert((await db.prepare('SELECT seconds FROM academy_study_time').first()).seconds>=15);checks++;
+ const news=(await work({action:'entry',kind:'noticia',title:'Notícia pública QA',status:'publicado',body:{description:'Texto aprovado QA',slug:'publica-qa'}})).entry;
+ await work({action:'entry',id:news.id,revision:news.revision,kind:'noticia',title:'Título pendente QA',status:'rascunho',body:{...news.body,description:'Ainda não aprovado QA'}});
+ const pub=await call('/api/workspace',null,{});assert(pub.entries.some(e=>e.title==='Notícia pública QA'));assert(!JSON.stringify(pub).includes('Ainda não aprovado'));checks+=2;
+ await api({action:'editorial_restore',id:news.id,revision:2,fromRevision:1});assert.equal((await db.prepare('SELECT revision FROM academy_entries WHERE id=?').bind(news.id).first()).revision,3);checks++;
+ const event=(await work({action:'entry',kind:'evento',title:'Evento QA',status:'publicado',body:{description:'Programa QA',slug:'evento-qa',start:'2027-01-10T09:00:00+02:00',end:'2027-01-10T10:00:00+02:00',capacity:1,registrationOpen:true,joinUrl:'https://example.invalid/private-join',joinCode:'secret-code'}})).entry;
+ const first=await call('/api/completion',{action:'event_register',eventId:event.id},a),second=await call('/api/completion',{action:'event_register',eventId:event.id},b);assert.equal(first.registration.state,'confirmado');assert.equal(second.registration.state,'espera');checks+=2;
+ assert(!JSON.stringify(await call('/api/completion?event='+event.id,null,{})).includes('secret-code'));assert(!String(await call('/api/completion?calendar='+event.id,null,{})).includes('secret-code'));checks+=2;
+ await call('/api/completion',{action:'event_cancel',eventId:event.id},a);assert.equal((await call('/api/completion?event='+event.id,null,b)).registration.state,'confirmado');checks++;
+ const dayEvent=(await work({action:'entry',kind:'evento',title:'Dia QA',status:'publicado',body:{description:'QA',slug:'dia-qa',start:'2027-01-10T00:00:00+02:00',end:'2027-01-10T23:59:59+02:00',allDay:true}})).entry;
+ const ics=String(await call('/api/completion?calendar='+dayEvent.id,null,{}));assert(ics.includes('DTSTART;VALUE=DATE:20270110'));assert(ics.includes('DTEND;VALUE=DATE:20270111'));checks+=2;
+ const expiredEvent=(await work({action:'entry',kind:'evento',title:'Evento expirado QA',status:'publicado',body:{description:'QA',slug:'expirado-qa',start:'2027-01-10T09:00:00+02:00',expiresAt:'2020-01-01T00:00:00Z',registrationOpen:true}})).entry;
+ await call('/api/completion?event='+expiredEvent.id,null,{},404);await call('/api/completion?calendar='+expiredEvent.id,null,{},404);await call('/api/completion',{action:'event_register',eventId:expiredEvent.id},a,404);
+ const before=await call('/api/completion',null,b);assert(before.notifications.length>=1);const other=(await call('/api/completion',null,a)).notifications[0];await call('/api/completion',{action:'notification_read',id:other.id},b);assert.equal((await db.prepare('SELECT readAt FROM academy_notifications WHERE id=?').bind(other.id).first()).readAt,null);checks++;
+ await call('/api/completion?integrations=1',null,b,403);
+ const future=(await work({action:'entry',kind:'noticia',title:'Publicação agendada QA',status:'agendado',body:{description:'QA',slug:'agendado-qa',publishAt:'2099-01-01T00:00:00Z'}})).entry;await db.prepare("UPDATE academy_entries SET payload=json_set(payload,'$.publishAt','2020-01-01T00:00:00.000Z') WHERE id=?").bind(future.id).run();await call('/api/scheduled',{}, {Authorization:'Bearer local-test-secret-long-enough-123456'});assert.equal((await db.prepare('SELECT status FROM academy_entries WHERE id=?').bind(future.id).first()).status,'publicado');checks++;
+ const draft=await academy({action:'course',title:'Rascunho QA',summary:'',category:'',hours:0,pass:80});await api({action:'course_trash',id:draft.id});assert(!(await academy()).courses.some(v=>v.id===draft.id));checks++;await api({action:'course_trash_restore',id:draft.id});assert((await academy()).courses.some(v=>v.id===draft.id));checks++;
+ await call('/api/completion',{action:'course_trash',id:c.id},owner,400);
+ const form=new FormData();form.set('file',new File(['%PDF-1.4\nQA'], 'trabalho.pdf',{type:'application/pdf'}));const file=await call('/api/completion?upload=assignment',form,a);await call('/api/completion?file='+file.id,null,b,404);assert(String(await call('/api/completion?file='+file.id,null,a)).startsWith('%PDF'));checks++;
+ const upload=new FormData();upload.set('file',new File([fs.readFileSync('tests/fixtures/imagem-qa.png')],'imagem.png',{type:'image/png'}));upload.set('purpose','formador');upload.set('alt','Imagem sintética QA');upload.set('credit','Gerada para teste técnico');
+ const image=await call('/api/completion?upload=image',upload);assert.deepEqual(image.variants.map(v=>v.width),[96]);checks++;
+ await call('/api/completion?image='+image.id,null,{},404);
+ await work({action:'entry',kind:'formador',title:'Formador QA',status:'publicado',body:{imageId:image.id,imageAlt:'Imagem sintética QA'}});await call('/api/completion?image='+image.id,null,{});
+ const invalidImage=new FormData();invalidImage.set('file',new File(['<svg/>'],'falsa.png',{type:'image/png'}));invalidImage.set('alt','QA');invalidImage.set('credit','QA');await call('/api/completion?upload=image',invalidImage,owner,400);
+ await academy({action:'lesson',courseId:draft.id,title:'Aula pacote',module:'M',body:'QA'});const packageLesson=(await call('/api/academy?course='+draft.id)).lessons[0];
+ const packageForm=new FormData(),z=zipSync({'imsmanifest.xml':strToU8('<manifest><metadata><schemaversion>1.2</schemaversion></metadata><resources><resource identifier="sco1" adlcp:scormtype="sco" href="index.html"/></resources></manifest>'),'index.html':strToU8('<html><head></head><body>Pacote QA</body></html>')});packageForm.set('file',new File([z],'curso.zip',{type:'application/zip'}));packageForm.set('courseId',draft.id);packageForm.set('lessonId',packageLesson.id);const pkg=await call('/api/completion?upload=package',packageForm);
+ await call('/api/completion',{action:'package_launch',id:pkg.id},a,403);await db.prepare("UPDATE courses SET status='publicado' WHERE id=?").bind(draft.id).run();await db.prepare('INSERT INTO enrollments(id,courseId,participant,province,institution,created,visitorKey) VALUES(?,?,?,?,?,?,?)').bind('package-enroll',draft.id,'QA','','',new Date().toISOString(),'qa-a').run();
+ const launch=await call('/api/completion',{action:'package_launch',id:pkg.id},a);const html=await call(launch.path,null,{});assert(html.includes('LMSInitialize'));assert(html.includes('Pacote QA'));checks+=2;
+ await call('/api/completion',{action:'package_commit',id:pkg.id,revision:0,data:{'cmi.core.lesson_location':'3'}},a);await call('/api/completion',{action:'package_commit',id:pkg.id,revision:0,data:{'cmi.core.lesson_location':'4'}},a,409);
+ await call('/api/completion',{action:'package_commit',id:pkg.id,revision:1,data:{'cmi.core.lesson_location':'5'}},b,403);
+ console.log('OK:',checks,'verificações de publicação, histórico, vagas, lista de espera, privacidade, trabalhos, estudo, agendamento e lixeira.');
+}finally{await mf.dispose();}

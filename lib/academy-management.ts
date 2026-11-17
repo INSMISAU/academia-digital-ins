@@ -1,3 +1,4 @@
+import * as completion from '@/app/api/completion/route';
 import * as exports from '@/app/api/export/route';
 import * as academy from '@/app/api/academy/route';
 import * as workspace from '@/app/api/workspace/route';
@@ -9,7 +10,7 @@ import * as settings from '@/app/api/registration/settings/route';
 import {withRoles} from './academy-roles';
 export async function management(req:Request,path:string[]){
  const route=path.join('/');
- const modules:Record<string,any>={academy,workspace,media,export:exports,'registration/settings':settings};
+ const modules:Record<string,any>={academy,workspace,completion,media,export:exports,'registration/settings':settings};
  const module=modules[route];
  const handler=module?.[req.method];
  if(handler)return withRoles(req,route,()=>handler(req));

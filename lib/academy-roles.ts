@@ -25,7 +25,7 @@ export function resourceCourse(c:RoleContext,kind:string,id:string):string{
  if(kind==='course')return c.courses.has(id)?id:'';
  if(kind==='cohort')return c.cohorts.get(id)?.courseId||'';
  if(kind==='enrollment')return c.enrollments.get(id)?.courseId||'';
- if(kind==='entry'){const e=c.entries.get(id);if(e?.kind==='curso')return e.id;if(['modulo','avaliacao'].includes(e?.kind))return e.body.courseId;}
+ if(kind==='entry'){const e=c.entries.get(id);if(e?.kind==='curso')return e.id;if(['modulo','avaliacao','tarefa','banco_questao'].includes(e?.kind))return e.body.courseId;}
  return c.scopes.get(kind+':'+id)?.courseId||'';
 }
 export function matches(c:RoleContext,g:Grant,kind:string,id:string,writeCourse=false){
@@ -69,6 +69,28 @@ export function viewsFor(c:RoleContext){
 }
 export async function authorize(c:RoleContext,req:Request,path:string){
  const u=new URL(req.url),parts=path.split('/'),api=parts[0];
+ if(api==='completion'){
+  if(req.method==='GET'){
+   const course=u.searchParams.get('course')||u.searchParams.get('manual')||u.searchParams.get('packages');if(course){requirePermission(c,people,'course',course);return;}
+   const event=u.searchParams.get('event')||u.searchParams.get('calendar');if(event){requirePermission(c,admins,'entry',event);return;}
+   const image=u.searchParams.get('image');if(image){requirePermission(c,editors,'media',image);return;}
+   const file=u.searchParams.get('file');if(file){const s=await one('SELECT enrollmentId FROM academy_submissions WHERE fileId=?',file);if(!s)deny();requirePermission(c,people,'enrollment',s.enrollmentId);return;}
+   if(globalRole(c))return;deny();
+  }
+  if(req.headers.get('Content-Type')?.startsWith('multipart/form-data')){
+   const f=await req.clone().formData();if(!['image','package'].includes(u.searchParams.get('upload')||''))deny();const course=f.get('courseId');if(typeof course==='string'&&course)requirePermission(c,editors,'course',course,true);else creation(c,admins,f.get('institutionId'));return;
+  }
+  const b=JSON.parse(await limitedText(req.clone() as Request,350000));
+  if(['run_jobs','course_trash_restore'].includes(b.action)){if(!globalRole(c))deny();return;}
+  if(b.action==='course_trash'){requirePermission(c,editors,'course',b.id,true);return;}
+  if(b.action?.startsWith('editorial_')){requirePermission(c,admins,'entry',b.id,true);return;}
+  if(['event_decision','event_attendance'].includes(b.action)){requirePermission(c,admins,'entry',b.eventId);return;}
+  if(b.action==='course_approve'){requirePermission(c,people,'enrollment',b.enrollmentId);return;}
+  if(b.action==='assignment_grade'){const s=await one('SELECT enrollmentId FROM academy_submissions WHERE id=?',b.id);if(!s)deny();requirePermission(c,people,'enrollment',s.enrollmentId);return;}
+  if(b.action==='assessment_grade'){const s=await one('SELECT enrollmentId FROM academy_assessment_runs WHERE id=?',b.id);if(!s)deny();requirePermission(c,people,'enrollment',s.enrollmentId);return;}
+  if(b.action==='discussion_moderate'){const d=await one('SELECT courseId FROM academy_discussions WHERE id=?',b.id);if(!d)deny();requirePermission(c,editors,'course',d.courseId,true);return;}
+  deny();
+ }
  if(req.method==='GET'){
   if(api==='academy'){const id=u.searchParams.get('course');if(id&&!canRead(c,'course',id))deny();return;}
   if(api==='workspace'){
@@ -111,8 +133,8 @@ export async function authorize(c:RoleContext,req:Request,path:string){
  }
  if(api==='workspace'){
   if(a==='entry'){
-   if(b.id&&c.entries.has(b.id))requirePermission(c,b.kind==='programa'?managers:['curso','modulo','avaliacao'].includes(b.kind)?editors:admins,'entry',b.id,true);
-   if(['curso','modulo','avaliacao'].includes(b.kind)){requirePermission(c,editors,'course',b.kind==='curso'?b.id:b.body?.courseId,true);}
+   if(b.id&&c.entries.has(b.id))requirePermission(c,b.kind==='programa'?managers:['curso','modulo','avaliacao','tarefa','banco_questao'].includes(b.kind)?editors:admins,'entry',b.id,true);
+   if(['curso','modulo','avaliacao','tarefa','banco_questao'].includes(b.kind)){requirePermission(c,editors,'course',b.kind==='curso'?b.id:b.body?.courseId,true);}
    else if(b.kind==='configuracao'){if(!globalRole(c))deny();}
    else if(!b.id||!c.entries.has(b.id))creation(c,b.kind==='programa'?managers:admins,b.institutionId);
    for(const id of [b.body?.programId,...(Array.isArray(b.body?.teacherIds)?b.body.teacherIds:[])].filter(Boolean))if(!canRead(c,'entry',id))deny();
@@ -134,6 +156,7 @@ export function coursePermissions(c:RoleContext,id:string){
 export async function filterRoleResponse(c:RoleContext,res:Response,path:string){
  if(!res.ok||!res.headers.get('Content-Type')?.includes('application/json'))return res;
  const d:any=await res.json();
+ if(path==='completion'){if(Array.isArray(d.submissions))d.submissions=d.submissions.filter((s:any)=>canRead(c,'enrollment',s.enrollmentId));if(Array.isArray(d.runs))d.runs=d.runs.filter((r:any)=>canRead(c,'enrollment',r.enrollmentId));}
  if(path==='academy'&&d.course)d.permissions=coursePermissions(c,d.course.id);
  if(path==='academy'&&Array.isArray(d.courses)){
   d.courses=d.courses.filter((x:any)=>canRead(c,'course',x.id)).map((x:any)=>({...x,permissions:coursePermissions(c,x.id),canCreateCohort:permitted(c,[...managers,'trainer'],'course',x.id,true)}));d.enrollments=d.enrollments.filter((x:any)=>canRead(c,'enrollment',x.id));

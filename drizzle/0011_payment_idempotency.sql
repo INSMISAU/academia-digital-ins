@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX `academy_payments_active` ON `academy_payments` (`account`,`courseId`,`amount`,`currency`) WHERE "academy_payments"."state" in ('pending','paid');--> statement-breakpoint
+CREATE UNIQUE INDEX `validation_academy_payments_active` ON `validation_academy_payments` (`account`,`courseId`,`amount`,`currency`) WHERE "validation_academy_payments"."state" in ('pending','paid');

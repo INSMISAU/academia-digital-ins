@@ -20,7 +20,7 @@ export function CourseEditor({value, busy, onSave,onAutoSave}: EditorProps) {
   const [preview, setPreview] = useState(false), [error, setError] = useState('');
   const update = (key: string, next: string | number) => {setForm({...form, [key]: next}); setError('');};
   let draftBody:any=null;try{draftBody={...value,title:form.title,category:form.category,hours:form.hours,pass:form.pass,summary:encodeOverview(form),action:'course'};}catch{}
-  const autoStatus=useDraftAutosave(draftBody,onAutoSave,!!value.id&&!busy&&!!form.title?.trim()&&!!form.category?.trim());
+  const autoStatus=useDraftAutosave(draftBody,onAutoSave,!!value.id&&!busy&&!!form.title?.trim());
   async function save(e: React.FormEvent) {
     e.preventDefault(); setError('');
     try {await onSave({...value, title: form.title, category: form.category, hours: form.hours, pass: form.pass, summary: encodeOverview(form), action: 'course'});}
@@ -30,11 +30,11 @@ export function CourseEditor({value, busy, onSave,onAutoSave}: EditorProps) {
     <fieldset disabled={busy} className="editor-fields"><div className="editor-switch"><Button type="button" variant={preview ? 'outline' : 'default'} onClick={() => setPreview(false)}>Editar ficha</Button><Button type="button" variant={preview ? 'default' : 'outline'} onClick={() => setPreview(true)}><Eye size={16}/>Pré-visualizar</Button></div>
     {preview ? <section className="editor-preview"><span className="eyebrow">PRÉ-VISUALIZAÇÃO · NÃO PUBLICADA</span><h2>{form.title || 'Título do curso'}</h2><p>{form.category}{form.hours > 0 ? ' · ' + form.hours + ' h' : ''}</p><CourseOverview summary={(() => {try {return encodeOverview(form);} catch {return form.summary;}})()}/></section> : <>
       <Field label="Título"><Input required maxLength={180} value={form.title} onChange={e => update('title', e.target.value)}/></Field>
-      <Field label="Resumo"><Textarea required maxLength={3000} value={form.summary} onChange={e => update('summary', e.target.value)}/></Field>
+      <Field label="Resumo"><Textarea maxLength={3000} value={form.summary} onChange={e => update('summary', e.target.value)}/></Field>
       <Field label="Objectivos de aprendizagem (um por linha)"><Textarea value={form.objectives} onChange={e => update('objectives', e.target.value)}/></Field>
       <Field label="A quem se destina"><Textarea value={form.audience} onChange={e => update('audience', e.target.value)}/></Field>
       <Field label="Requisitos de participação"><Textarea value={form.prerequisites} onChange={e => update('prerequisites', e.target.value)}/></Field>
-      <div className="form-grid"><Field label="Área temática"><Input required maxLength={100} value={form.category} onChange={e => update('category', e.target.value)}/></Field><Field label="Modalidade"><select aria-label="Modalidade" value={form.modality} onChange={e => update('modality', e.target.value)}><option value="">Por definir</option>{modalities.map(m => <option key={m}>{m}</option>)}</select></Field></div>
+      <div className="form-grid"><Field label="Área temática"><Input maxLength={100} value={form.category} onChange={e => update('category', e.target.value)}/></Field><Field label="Modalidade"><select aria-label="Modalidade" value={form.modality} onChange={e => update('modality', e.target.value)}><option value="">Por definir</option>{modalities.map(m => <option key={m}>{m}</option>)}</select></Field></div>
       <div className="form-grid"><Field label="Carga horária (0 = por definir)"><Input type="number" min={0} max={1000} required value={form.hours} onChange={e => update('hours', Number(e.target.value))}/></Field><Field label="Nota mínima (%)"><Input type="number" min={1} max={100} required value={form.pass} onChange={e => update('pass', Number(e.target.value))}/></Field></div>
     </>}
     <SaveStatus error={error} busy={busy}/><p className="autosave-status" role="status">{autoStatus}</p><Button type="submit" disabled={busy}>{busy ? 'A guardar…' : 'Guardar rascunho'}</Button></fieldset>

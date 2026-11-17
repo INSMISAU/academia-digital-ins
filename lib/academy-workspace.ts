@@ -1,11 +1,11 @@
-export const entryKinds = ['programa','formador','categoria','recurso','noticia','evento','anuncio','configuracao','curso','modulo','avaliacao'] as const;
+export const entryKinds = ['programa','formador','categoria','recurso','noticia','evento','anuncio','configuracao','curso','modulo','avaliacao','tarefa','banco_questao'] as const;
 export type EntryKind = typeof entryKinds[number];
-export type Entry = {id:string;kind:EntryKind;title:string;status:'rascunho'|'publicado'|'arquivado';body:any;revision:number;created:string;updated:string};
+export type Entry = {id:string;kind:EntryKind;title:string;status:'rascunho'|'em_revisao'|'publicado'|'agendado'|'arquivado'|'lixo';body:any;revision:number;created:string;updated:string};
 export type Workspace = {entries:Entry[];members:any[];attendance:any[]};
 export const emptyWorkspace:Workspace = {entries:[],members:[],attendance:[]};
-export const kindNames:Record<EntryKind,string> = {programa:'Programa',formador:'Formador',categoria:'Categoria',recurso:'Material da biblioteca',noticia:'Notícia',evento:'Evento',anuncio:'Anúncio',configuracao:'Configuração',curso:'Configuração de curso',modulo:'Módulo',avaliacao:'Avaliação'};
+export const kindNames:Record<EntryKind,string> = {programa:'Programa',formador:'Formador',categoria:'Categoria',recurso:'Material da biblioteca',noticia:'Notícia',evento:'Evento',anuncio:'Anúncio',configuracao:'Configuração',curso:'Configuração de curso',modulo:'Módulo',avaliacao:'Avaliação',tarefa:'Actividade',banco_questao:'Questão do banco'};
 export const provinces=['Maputo Cidade','Maputo Província','Gaza','Inhambane','Sofala','Manica','Tete','Zambézia','Nampula','Niassa','Cabo Delgado'];
-export function entriesOf(work:Workspace,kind:EntryKind){return work.entries.filter(e=>e.kind===kind&&e.status!=='arquivado');}
+export function entriesOf(work:Workspace,kind:EntryKind){return work.entries.filter(e=>e.kind===kind&&!['arquivado','lixo'].includes(e.status));}
 export function courseSetup(work:Workspace,id:string){return work.entries.find(e=>e.kind==='curso'&&e.id===id)?.body||{};}
 export function courseModules(work:Workspace,id:string){return entriesOf(work,'modulo').filter(e=>e.body.courseId===id).sort((a,b)=>(a.body.position||0)-(b.body.position||0)||a.title.localeCompare(b.title,'pt'));}
 export function courseAssessments(work:Workspace,id:string){return entriesOf(work,'avaliacao').filter(e=>e.body.courseId===id);}
@@ -27,11 +27,12 @@ export function parseCSV(text:string):Record<string,string>[] {
  if(rows.length>500)throw Error('Importe até 500 participantes por operação.');
  return rows.map(r=>Object.fromEntries(headers.map((h,i)=>[h,(r[i]||'').trim()])));
 }
-export type Question={id:string;type:'unica'|'multipla'|'verdadeiro'|'curta';prompt:string;options:string[];answer:number|number[]|string;explanation:string};
+export type Question={id:string;type:'unica'|'multipla'|'verdadeiro'|'curta'|'longa'|'ordem'|'associacao';prompt:string;options:string[];answer:number|number[]|string;explanation:string};
 export function normaliseAnswer(value:unknown){return normalise(value).replace(/\s+/g,' ');}
 export function gradeQuestions(questions:Question[],answers:Record<string,unknown>){
  const review=questions.map(q=>{const selected=answers[q.id];let correct=false;
   if(q.type==='curta')correct=String(q.answer).split('|').some(a=>normaliseAnswer(a)===normaliseAnswer(selected))&&!!normaliseAnswer(selected);
+  else if(['ordem','associacao'].includes(q.type))correct=Array.isArray(selected)&&JSON.stringify(selected)===JSON.stringify(q.answer);
   else if(q.type==='multipla'){const expected=(q.answer as number[]).slice().sort((a,b)=>a-b);const chosen=Array.isArray(selected)?[...new Set(selected)].sort((a:any,b:any)=>a-b):[];correct=JSON.stringify(expected)===JSON.stringify(chosen);}
   else correct=Number.isInteger(selected)&&selected===q.answer;
   return {id:q.id,type:q.type,prompt:q.prompt,options:q.options,selected:selected??null,answer:q.answer,correct,explanation:q.explanation};

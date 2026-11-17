@@ -3,6 +3,7 @@ import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 
 export default {
+  async scheduled(_event: ScheduledController, _env: Cloudflare.Env, ctx: ExecutionContext) { ctx.waitUntil(import("../lib/academy/jobs").then(m=>m.runJobs())); },
   fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and

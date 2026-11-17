@@ -47,6 +47,7 @@ export function setParticipantSession(token:string){
 let managementInstitution='';
 export function setManagementInstitution(id:string){managementInstitution=id;}
 export function beginParticipant(){
+ if(typeof sessionStorage!=='undefined')for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key?.startsWith('ins-offline-course:'))sessionStorage.removeItem(key);}
  setManagementInstitution('');
  const token=academyRequestId()+academyRequestId();
  // New tabs must not recover the previous participant through the legacy browser-wide token.
@@ -86,7 +87,7 @@ export async function clearTeamAccess(){
 function teamToken(){try{const saved=sessionStorage.getItem(administratorKey);if(saved){const session=JSON.parse(saved);return session.expires>Date.now()&&/^[a-f0-9]{64}$/.test(session.token)?session.token:'';}return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
 export function academyUrl(path: string) {
   if (path.startsWith('/api/')&&!path.startsWith('/api/team-access')&&!path.startsWith('/api/administration-session')) {
-    if(academyManagement()&&(/^\/api\/(academy|workspace|media|certificate|resource|export)(\/|\?|$)/.test(path)||path.startsWith('/api/registration/settings')))path='/api/management/'+path.slice(5);
+    if(academyManagement()&&(/^\/api\/(academy|workspace|completion|media|certificate|resource|export)(\/|\?|$)/.test(path)||path.startsWith('/api/registration/settings')))path='/api/management/'+path.slice(5);
     if(academyValidation())path='/api/validation/'+path.slice(5);
     else if(academyAdministration())path='/api/administration/'+path.slice(5);
   }
@@ -117,6 +118,7 @@ export function academyFetch(path: string, init: RequestInit = {}) {
 // Bound read requests, including the response body. Writes keep their existing
 // behaviour and are never retried automatically.
 export async function academyReadJson(path: string, timeoutMs = 20_000) {
+  if(typeof navigator!=='undefined'&&!navigator.onLine){const {offlineResponse}=await import('./academy-offline');const offline=offlineResponse(path);if(offline)return offline;}
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {

@@ -1,3 +1,6 @@
+import {AcademyError} from '@/lib/academy/core';
+import {editorialKinds,saveEditorial,visibleEntries} from '@/lib/academy/editorial';
+import {cleanLearningEntry,learningAccess} from '@/lib/academy/learning';
 import {auditActor} from '@/db/actor';
 import {scopeStatements,roleContext} from '@/lib/academy-roles';
 import {withPagesCors,pagesPreflight,permittedOrigin} from '@/lib/academy-cors';
@@ -21,19 +24,23 @@ async function draft(id:string){const c=await course(id);if(c.status!=='rascunho
 async function kindRef(id:string,kind:EntryKind){if(!id)return;const e=await entry(id);if(e.kind!==kind||e.status==='arquivado')fail('A referência seleccionada não está disponível.');}
 function validateQuestion(v:any):Question{
  const id=str(v.id,100),prompt=str(v.prompt,2000),explanation=str(v.explanation,3000,true);
- if(!['unica','multipla','verdadeiro','curta'].includes(v.type))fail('Tipo de questão inválido.');
+ if(!['unica','multipla','verdadeiro','curta','longa','ordem','associacao'].includes(v.type))fail('Tipo de questão inválido.');
+ if(v.type==='longa')return {id,type:v.type,prompt,options:[],answer:'',explanation};
  if(v.type==='curta')return {id,type:v.type,prompt,options:[],answer:str(v.answer,500),explanation};
  const options=v.type==='verdadeiro'?['Verdadeiro','Falso']:(Array.isArray(v.options)?v.options.map((s:any)=>str(s,800)):[]);
  if(options.length<2||options.length>12)fail('Introduza entre 2 e 12 opções.');
+ if(['ordem','associacao'].includes(v.type)){const answer=Array.isArray(v.answer)?v.answer.map((x:any)=>num(x,0,options.length-1)):[];if(answer.length!==options.length||new Set(answer).size!==options.length)fail('Defina a correspondência ou ordem de todas as opções.');return {id,type:v.type,prompt,options,answer,explanation};}
  const answer=v.type==='multipla'?(Array.isArray(v.answer)?[...new Set<number>(v.answer.map((x:any)=>num(x,0,options.length-1)))]:[]):num(v.answer,0,options.length-1);
  if(Array.isArray(answer)&&!answer.length)fail('Seleccione pelo menos uma resposta correcta.');
  return {id,type:v.type,prompt,options,answer,explanation};
 }
 async function cleanEntry(kind:EntryKind,body:any,status:string,id:string){
  if(!body||typeof body!=='object'||Array.isArray(body))fail('Conteúdo inválido.');
+ if(kind==='tarefa')return cleanLearningEntry(kind,body,status);
+ if(kind==='banco_questao'){await draft(str(body.courseId,100));return {courseId:body.courseId,question:validateQuestion(body.question)};}
  const base={description:str(body.description,20000,true)};
  if(['programa','formador','categoria','noticia','evento','anuncio'].includes(kind)){
-  const b:any={...base,category:str(body.category,120,true),tags:str(body.tags,500,true),imageUrl:link(body.imageUrl)};
+  const b:any={...base,category:str(body.category,120,true),tags:str(body.tags,500,true),imageUrl:link(body.imageUrl),imageId:str(body.imageId,100,true),imageAlt:str(body.imageAlt,500,true),imageCredit:str(body.imageCredit,500,true)};
   if(kind==='formador'){b.institution=str(body.institution,200,true);b.specialty=str(body.specialty,200,true);}
   if(kind==='evento'){b.date=day(body.date,false);b.ends=day(body.ends);if(b.ends&&b.ends<b.date)fail('A data de fim deve ser posterior à data de início.');b.location=str(body.location,300,true);b.url=link(body.url);}
   return b;
@@ -44,27 +51,29 @@ async function cleanEntry(kind:EntryKind,body:any,status:string,id:string){
   return {name:str(body.name,120),description:str(body.description,2000,true),about:str(body.about,12000,true),logoUrl:link(body.logoUrl),faviconUrl:link(body.faviconUrl),color};
  }
  if(kind==='recurso'){
+  if(body.visibility==='inscritos')await course(str(body.courseId,100));
   const fileId=str(body.fileId,100,true),url=link(body.url);if(!fileId&&!url)fail('Escolha um ficheiro ou uma ligação.');
   if(fileId&&!await one('SELECT id FROM media WHERE id=?',fileId))fail('Ficheiro não encontrado.');
-  return {...base,fileId,url,category:str(body.category,120,true),tags:str(body.tags,500,true),type:str(body.type,60),source:str(body.source,1000,true)};
+  return {...base,fileId,url,visibility:body.visibility==='inscritos'?'inscritos':'publico',courseId:str(body.courseId,100,true),allowDownload:body.allowDownload!==false,category:str(body.category,120,true),tags:str(body.tags,500,true),type:str(body.type,60),source:str(body.source,1000,true)};
  }
  if(kind==='curso'){
-  await course(id);const programId=str(body.programId,100,true);await kindRef(programId,'programa');const teacherIds=ids(body.teacherIds);for(const id of teacherIds)await kindRef(id,'formador');
+  await draft(id);const prerequisites=ids(body.prerequisiteCourses);for(const ref of prerequisites){await course(ref);const pending=[ref],visited=new Set<string>();while(pending.length){const check=pending.pop()!;if(check===id)fail('Os pré-requisitos não podem formar um ciclo.');if(visited.has(check))continue;visited.add(check);const rec=await one("SELECT payload FROM academy_entries WHERE id=? AND kind='curso'",check);if(rec)pending.push(...(JSON.parse(rec.payload).prerequisiteCourses||[]));}}const programId=str(body.programId,100,true);await kindRef(programId,'programa');const teacherIds=ids(body.teacherIds);for(const id of teacherIds)await kindRef(id,'formador');
   const format=['gratuito','pago','sazonal'].includes(body.format)?body.format:'gratuito';
   const starts=day(body.starts),ends=day(body.ends),registrationStarts=day(body.registrationStarts),registrationEnds=day(body.registrationEnds);
   if(starts&&ends&&starts>ends||registrationStarts&&registrationEnds&&registrationStarts>registrationEnds)fail('Verifique os períodos de inscrição e de formação.');
   const price=Number(body.price||0);if(!Number.isFinite(price)||price<0||price>1e9)fail('Preço inválido.');
-  return {programId,teacherIds,format,price,currency:['MZN','USD','ZAR','EUR'].includes(body.currency)?body.currency:'MZN',starts,ends,registrationStarts,registrationEnds,accessDays:num(body.accessDays||0,0,3650),notes:str(body.notes,12000,true)};
+  for(const [key,type] of [['templateId','application/pdf'],['signatureId','image/']]){const ref=body.certificate?.[key];if(ref){const m=await one('SELECT type FROM media WHERE id=?',str(ref,100));if(!m||!m.type.startsWith(type))fail('Ficheiro de certificado inválido.');}}
+  return {imageId:str(body.imageId,100,true),imageAlt:str(body.imageAlt,500,true),imageCredit:str(body.imageCredit,500,true),prerequisiteCourses:ids(body.prerequisiteCourses).filter(x=>x!==id),minStudyMinutes:num(body.minStudyMinutes||0,0,100000),minAttendance:num(body.minAttendance||0,0,100),requireTrainerApproval:body.requireTrainerApproval===true,certificate:body.certificate&&typeof body.certificate==='object'?{institution:str(body.certificate.institution,200,true),signatureId:str(body.certificate.signatureId,100,true),templateId:str(body.certificate.templateId,100,true),validityDays:num(body.certificate.validityDays||0,0,36500)}:{},programId,teacherIds,format,price,currency:['MZN','USD','ZAR','EUR'].includes(body.currency)?body.currency:'MZN',starts,ends,registrationStarts,registrationEnds,accessDays:num(body.accessDays||0,0,3650),notes:str(body.notes,12000,true)};
  }
  if(kind==='modulo'){
   const courseId=str(body.courseId,100);await draft(courseId);
-  return {courseId,position:num(body.position||0),objectives:str(body.objectives,5000,true),notes:str(body.notes,10000,true)};
+  const prerequisiteModules=ids(body.prerequisiteModules).filter(x=>x!==id);for(const ref of prerequisiteModules){const m=await entry(ref);if(m.kind!=='modulo'||m.body.courseId!==courseId)fail('Pré-requisito de módulo inválido.');const pending=[...m.body.prerequisiteModules||[]],visited=new Set<string>();while(pending.length){const check=pending.pop()!;if(check===id)fail('Os pré-requisitos dos módulos não podem formar um ciclo.');if(visited.has(check))continue;visited.add(check);pending.push(...((await entry(check)).body.prerequisiteModules||[]));}}return {courseId,availableAt:body.availableAt?new Date(str(body.availableAt,40)).toISOString():'',prerequisiteModules,position:num(body.position||0),objectives:str(body.objectives,5000,true),notes:str(body.notes,10000,true)};
  }
  if(kind==='avaliacao'){
   const courseId=str(body.courseId,100);await draft(courseId);if(!['pre','pos'].includes(body.stage))fail('Seleccione Pré-teste ou Pós-teste.');
   const questions=Array.isArray(body.questions)?body.questions.map(validateQuestion):[];if(questions.length>100||status==='publicado'&&!questions.length)fail('Para disponibilizar a avaliação, adicione entre 1 e 100 questões.');
   if(new Set(questions.map((q:Question)=>q.id)).size!==questions.length)fail('As questões devem ter identificações distintas.');
-  return {courseId,stage:body.stage,pass:num(body.pass||80,1,100),minutes:num(body.minutes||0,0,240),attempts:num(body.attempts||0,0,100),random:body.random===true,questionCount:num(body.questionCount||0,0,questions.length),questions};
+  return {courseId,examMode:body.examMode===true,stage:body.stage,pass:num(body.pass||80,1,100),minutes:num(body.minutes||0,0,240),attempts:num(body.attempts||0,0,100),random:body.random===true,questionCount:num(body.questionCount||0,0,questions.length),questions};
  }
  fail('Tipo de registo inválido.');
 }
@@ -83,11 +92,12 @@ async function read(req:Request){
  const raw=await all('SELECT * FROM academy_entries ORDER BY updated DESC');let entries=raw.map(unpack);
  if(!admin){
   const published=new Set((await all("SELECT id FROM courses WHERE status='publicado'")).map(c=>c.id));
-  entries=entries.filter(e=>e.status==='publicado'&&(!['curso','modulo','avaliacao'].includes(e.kind)||published.has(e.kind==='curso'?e.id:e.body.courseId))).map(e=>e.kind==='avaliacao'?{...e,body:{...e.body,questionTotal:e.body.questions.length,questions:undefined}}:e);
+  entries=await visibleEntries(entries,false);
+  entries=entries.filter(e=>e.kind!=='banco_questao'&&e.status==='publicado'&&(!['curso','modulo','avaliacao','tarefa'].includes(e.kind)||published.has(e.kind==='curso'?e.id:e.body.courseId))).map(e=>e.kind==='avaliacao'?{...e,body:{...e.body,questionTotal:e.body.questions.length,questions:undefined}}:e);
  }
  return json({entries,members:admin?await all('SELECT * FROM academy_cohort_members'):[],attendance:admin?await all('SELECT * FROM academy_attendance'):[]});
 }
-function runView(r:any){const snap=JSON.parse(r.snapshot);return {id:r.id,enrollmentId:r.enrollmentId,assessmentId:r.assessmentId,stage:r.stage,state:r.state,started:r.started,deadline:r.deadline,title:snap.title,pass:snap.pass,answers:r.answers?JSON.parse(r.answers):{},score:r.score,submitted:r.submitted,questions:r.state==='active'?snap.questions.map(({answer,explanation,...q}:Question)=>q):[],review:r.state==='submitted'?JSON.parse(r.review):null};}
+function runView(r:any){const snap=JSON.parse(r.snapshot);return {id:r.id,enrollmentId:r.enrollmentId,assessmentId:r.assessmentId,stage:r.stage,state:r.state,started:r.started,deadline:r.deadline,examMode:snap.examMode===true,title:snap.title,pass:snap.pass,answers:r.answers?JSON.parse(r.answers):{},score:r.score,submitted:r.submitted,questions:r.state==='active'?snap.questions.map(({answer,explanation,...q}:Question)=>q):[],review:['submitted','pending'].includes(r.state)?JSON.parse(r.review):null};}
 async function write(req:Request){
  if(!permittedOrigin(req))fail('Origem não autorizada.',403);const text=await req.text();if(text.length>300000)fail('Pedido demasiado grande.',413);let b:any;try{b=JSON.parse(text);}catch{fail('Pedido inválido.');}
  const admin=isAdmin(req),a=b.action;
@@ -95,32 +105,33 @@ async function write(req:Request){
   let r:any;
   if(a==='assessment_start'){
    const enrollmentId=str(b.enrollmentId,100);if(!await ownsEnrollment(req,enrollmentId))fail('Percurso indisponível nesta sessão.',403);
-   const enrollment=await one('SELECT * FROM enrollments WHERE id=?',enrollmentId);if(!enrollment)fail('Inscrição não encontrada.',404);
+   const enrollment=await one('SELECT * FROM enrollments WHERE id=?',enrollmentId);if(!enrollment)fail('Inscrição não encontrada.',404);await learningAccess(enrollment);
    const assessment=await entry(str(b.assessmentId,100));if(assessment.kind!=='avaliacao'||assessment.status!=='publicado'||assessment.body.courseId!==enrollment.courseId)fail('Avaliação indisponível.',404);
    const c=await course(enrollment.courseId);if(c.status!=='publicado'||c.external)fail('Avaliação indisponível para este curso.');
    const existing=await one("SELECT * FROM academy_assessment_runs WHERE enrollmentId=? AND assessmentId=? AND state='active' ORDER BY started DESC LIMIT 1",enrollmentId,assessment.id);if(existing)return json(runView(existing));
-   const count=(await one("SELECT COUNT(*) n FROM academy_assessment_runs WHERE enrollmentId=? AND assessmentId=? AND state='submitted'",enrollmentId,assessment.id)).n;if(assessment.body.attempts&&count>=assessment.body.attempts)fail('Atingiu o número de tentativas definido para esta avaliação.');
+   const count=(await one("SELECT COUNT(*) n FROM academy_assessment_runs WHERE enrollmentId=? AND assessmentId=? AND state IN ('submitted','pending')",enrollmentId,assessment.id)).n;if(assessment.body.attempts&&count>=assessment.body.attempts)fail('Atingiu o número de tentativas definido para esta avaliação.');
    let qs:Question[]=assessment.body.questions.map((q:Question)=>({...q}));if(assessment.body.random)for(let i=qs.length-1;i>0;i--){const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1);[qs[i],qs[j]]=[qs[j],qs[i]];}if(assessment.body.questionCount)qs=qs.slice(0,assessment.body.questionCount);
    const id=str(b.requestId,100),started=now(),deadline=assessment.body.minutes?new Date(Date.now()+assessment.body.minutes*60000).toISOString():null;
-   const snap={title:assessment.title,pass:assessment.body.pass,revision:assessment.revision,questions:qs};
+   const snap={examMode:assessment.body.examMode===true,title:assessment.title,pass:assessment.body.pass,revision:assessment.revision,questions:qs};
    try{await db().prepare("INSERT INTO academy_assessment_runs (id,enrollmentId,assessmentId,stage,state,started,deadline,snapshot,answers) VALUES (?,?,?,?,'active',?,?,?,'{}')").bind(id,enrollmentId,assessment.id,assessment.body.stage,started,deadline,JSON.stringify(snap)).run();}catch{const same=await one('SELECT * FROM academy_assessment_runs WHERE id=?',id);if(!same||same.enrollmentId!==enrollmentId||same.assessmentId!==assessment.id)fail('Não foi possível iniciar a tentativa. Tente novamente.',409);return json(runView(same));}
    r=await one('SELECT * FROM academy_assessment_runs WHERE id=?',id);return json(runView(r));
   }
-  r=await one('SELECT * FROM academy_assessment_runs WHERE id=?',str(b.id,100));if(!r)fail('Tentativa não encontrada.',404);if(!await ownsEnrollment(req,r.enrollmentId))fail('Percurso indisponível nesta sessão.',403);if(r.state==='submitted')return json(runView(r));
+  r=await one('SELECT * FROM academy_assessment_runs WHERE id=?',str(b.id,100));if(!r)fail('Tentativa não encontrada.',404);if(!await ownsEnrollment(req,r.enrollmentId))fail('Percurso indisponível nesta sessão.',403);if(['submitted','pending'].includes(r.state))return json(runView(r));
   const snap=JSON.parse(r.snapshot),expired=!!r.deadline&&Date.now()>Date.parse(r.deadline);
   if(!b.answers||typeof b.answers!=='object'||Array.isArray(b.answers))fail('Respostas inválidas.');
-  const answers=Object.fromEntries(snap.questions.filter((q:Question)=>Object.hasOwn(b.answers,q.id)).map((q:Question)=>{const v=b.answers[q.id];if(q.type==='curta')return[q.id,str(v,1000,true)];if(q.type==='multipla'){if(!Array.isArray(v))fail('Resposta inválida.');return[q.id,[...new Set(v.map((x:any)=>num(x,0,q.options.length-1)))]];}return[q.id,num(v,0,q.options.length-1)];}));
+  const answers=Object.fromEntries(snap.questions.filter((q:Question)=>Object.hasOwn(b.answers,q.id)).map((q:Question)=>{const v=b.answers[q.id];if(q.type==='curta'||q.type==='longa')return[q.id,str(v,q.type==='longa'?10000:1000,true)];if(['ordem','associacao'].includes(q.type)){if(!Array.isArray(v)||v.length!==q.options.length)fail('Resposta inválida.');return[q.id,v.map((x:any)=>num(x,0,q.options.length-1))]};if(q.type==='multipla'){if(!Array.isArray(v))fail('Resposta inválida.');return[q.id,[...new Set(v.map((x:any)=>num(x,0,q.options.length-1)))]];}return[q.id,num(v,0,q.options.length-1)];}));
   if(a==='assessment_answers'){
    if(expired)return json({saved:false,expired:true});await db().prepare("UPDATE academy_assessment_runs SET answers=? WHERE id=? AND state='active'").bind(JSON.stringify(answers),r.id).run();return json({saved:true});
   }
   const finalAnswers=expired?JSON.parse(r.answers||'{}'):answers;
-  if(!expired&&snap.questions.some((q:Question)=>!Object.hasOwn(finalAnswers,q.id)||(q.type==='curta'&&!String(finalAnswers[q.id]).trim())||(q.type==='multipla'&&!finalAnswers[q.id].length)))fail('Responda a todas as questões antes de submeter.');
-  const result=gradeQuestions(snap.questions,finalAnswers),submitted=now();const statements=[db().prepare("UPDATE academy_assessment_runs SET state='submitted',answers=?,review=?,score=?,submitted=? WHERE id=? AND state='active'").bind(JSON.stringify(finalAnswers),JSON.stringify({questions:result.review,expired}),result.score,submitted,r.id)];
-  if(r.stage==='pos')statements.push(db().prepare('INSERT OR IGNORE INTO attempts (id,enrollmentId,score,answers,created) VALUES (?,?,?,?,?)').bind(r.id,r.enrollmentId,result.score,JSON.stringify(finalAnswers),submitted));
+  if(!expired&&snap.questions.some((q:Question)=>!Object.hasOwn(finalAnswers,q.id)||(['curta','longa'].includes(q.type)&&!String(finalAnswers[q.id]).trim())||(q.type==='multipla'&&!finalAnswers[q.id].length)))fail('Responda a todas as questões antes de submeter.');
+  const result=gradeQuestions(snap.questions,finalAnswers),manual=snap.questions.some((q:Question)=>q.type==='longa'),submitted=now();const statements=[db().prepare("UPDATE academy_assessment_runs SET state=?,answers=?,review=?,score=?,submitted=? WHERE id=? AND state='active'").bind(manual?'pending':'submitted',JSON.stringify(finalAnswers),JSON.stringify({questions:result.review,expired}),manual?null:result.score,submitted,r.id)];
+  if(r.stage==='pos'&&!manual)statements.push(db().prepare('INSERT OR IGNORE INTO attempts (id,enrollmentId,score,answers,created) VALUES (?,?,?,?,?)').bind(r.id,r.enrollmentId,result.score,JSON.stringify(finalAnswers),submitted));
   statements.push(db().prepare('INSERT INTO audit (id,action,entity,detail,created,actor,institution) SELECT ?,?,?,?,?,?,? WHERE changes()>0').bind(uid(),r.stage==='pre'?'Submeter pré-teste':'Submeter pós-teste',r.enrollmentId,result.score+'%',submitted,auditActor().id,auditActor().institution));await db().batch(statements);return json(runView(await one('SELECT * FROM academy_assessment_runs WHERE id=?',r.id)));
  }
  if(!admin)fail('Operação reservada à administração.',403);
  if(a==='entry'){
+  if(editorialKinds.includes(b.kind))return json(await saveEditorial(b));
   if(!entryKinds.includes(b.kind))fail('Tipo de registo inválido.');const kind=b.kind as EntryKind;const id=b.id?str(b.id,100):uid();const title=str(b.title,200);const status=['rascunho','publicado','arquivado'].includes(b.status)?b.status:'rascunho';const revision=num(b.revision||0);const old=await one('SELECT * FROM academy_entries WHERE id=?',id);
   if(old&&(old.kind!==kind||old.revision!==revision)||!old&&revision!==0)fail('Este registo foi actualizado noutra sessão. Reabra-o antes de guardar.',409);
   const body=await cleanEntry(kind,b.body,status,id),t=now();
@@ -164,7 +175,7 @@ async function write(req:Request){
  }
  return fail('Operação não reconhecida.');
 }
-async function handle(req:Request,fn:()=>Promise<Response>){try{return await fn();}catch(e:any){if(!(e instanceof RequestError))console.error(e);return json({error:e instanceof RequestError?e.message:'Não foi possível concluir a operação. Tente novamente.'},e instanceof RequestError?e.status:503);}}
+async function handle(req:Request,fn:()=>Promise<Response>){try{return await fn();}catch(e:any){if(!(e instanceof RequestError)&&!(e instanceof AcademyError))console.error(e);return json({error:e instanceof RequestError||e instanceof AcademyError?e.message:'Não foi possível concluir a operação. Tente novamente.'},e instanceof RequestError||e instanceof AcademyError?e.status:503);}}
 export const GET=(req:Request)=>withPagesCors(req,()=>handle(req,()=>read(req)));
 export const POST=(req:Request)=>withPagesCors(req,()=>handle(req,()=>write(req)));
 export const OPTIONS=pagesPreflight;

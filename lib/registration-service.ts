@@ -1,3 +1,4 @@
+import {registrationRules} from './academy/learning';
 import {cleanAnswers} from './registration';
 type Store={prepare:(sql:string)=>D1PreparedStatement;batch:(statements:D1PreparedStatement[])=>Promise<unknown>};
 type Settings={enabled:number;notice:string;privacy:string|null};
@@ -18,6 +19,7 @@ export async function submitRegistration(store:Store, owner:string, input:any, v
  const id=typeof input.courseId==='string'?input.courseId:'';
  const course=await store.prepare("SELECT id,title,external FROM courses WHERE id=? AND status='publicado'").bind(id).first<{id:string;title:string;external:string|null}>();
  if(!course)return result({error:'O curso não está disponível para inscrição.'},404);
+ try{await registrationRules(id,owner);}catch(e:any){return result({error:e.message},e.status||400);}
  const {answers,errors}=cleanAnswers(input.answers);
  if(Object.keys(errors).length)return result({errors,error:'Reveja os campos indicados.'},422);
  const raw=await store.prepare('SELECT enabled,notice,privacy FROM academy_registration_settings WHERE id=1').first<Settings>();

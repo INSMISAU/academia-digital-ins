@@ -64,6 +64,27 @@
       "when": 1794853138273,
       "tag": "0008_role_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794913225958,
+      "tag": "0009_academy_completion",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794914024250,
+      "tag": "0010_package_launches",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1794915253570,
+      "tag": "0011_payment_idempotency",
+      "breakpoints": true
     }
   ]
 }

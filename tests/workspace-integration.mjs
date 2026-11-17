@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url);
 const {Miniflare}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
 // All records in this file exist only in a fresh, isolated in-memory database.
-const mf=new Miniflare({modules:[{type:'ESModule',path:'dist/server/index.js'},...fs.readdirSync('dist/server',{recursive:true}).filter(p=>p.endsWith('.js')&&p!=='index.js').map(p=>({type:'ESModule',path:'dist/server/'+p}))],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['BUCKET'],cf:false});
+const mf=new Miniflare({modules:[{type:'ESModule',path:'dist/server/index.js'},...fs.readdirSync('dist/server',{recursive:true}).filter(p=>p.endsWith('.js')&&p!=='index.js').map(p=>({type:'ESModule',path:'dist/server/'+p})),...fs.readdirSync('dist/server',{recursive:true}).filter(p=>p.endsWith('.wasm')).map(p=>({type:'CompiledWasm',path:'dist/server/'+p}))],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['BUCKET'],cf:false});
 const identity={'oai-authenticated-user-id':'qa-owner','oai-authenticated-user-email':'perciliamuianga@gmail.com'};
 let checks=0;
 async function call(path,body=null,headers=identity,status=200){const response=await mf.dispatchFetch('http://academy.test'+path,{...(body?{method:'POST',body:JSON.stringify(body)}:{}),headers:{...headers,...(body?{'Content-Type':'application/json',Origin:'http://academy.test'}:{})}});const text=await response.text();assert.equal(response.status,status,text);checks++;let data;try{data=JSON.parse(text);}catch{}return {data,response,text};}
@@ -13,6 +13,13 @@ const guest=async(body=null,path='/api/workspace',cookie='',status=200)=>call(pa
 const save=async(kind,title,body={},status='rascunho',id=crypto.randomUUID(),revision=0)=>(await api({action:'entry',kind,title,body,status,id,revision})).entry;
 try{
  const db=await mf.getD1Database('DB');for(const file of fs.readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())for(const sql of fs.readFileSync('drizzle/'+file,'utf8').split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+
+// Enrollment fixtures for learning tests. Public registration is tested separately in registration.mjs.
+async function fixtureEnrollment(courseId,token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','')){
+ const key=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex'),id=crypto.randomUUID();
+ await db.prepare('INSERT INTO enrollments(id,courseId,participant,province,institution,created,visitorKey) VALUES(?,?,?,?,?,?,?)').bind(id,courseId,'QA '+id,'','',new Date().toISOString(),key).run();
+ const cookie='__Host-academy-demo='+token;return {d:{id},data:{id},cookie,response:new Response(null,{headers:{'set-cookie':cookie+'; Path=/; Secure'}})};
+}
  assert.equal((await api()).entries.length,0,'No invented institutional records are seeded');checks++;
  await guest({action:'entry',kind:'programa',title:'Intrusão',body:{}},'/api/workspace','',403);
  let program=await save('programa','Programa QA',{description:'Registo de teste isolado'});
@@ -47,8 +54,8 @@ try{
  for(const status of ['em_revisao','aprovado','publicado'])await api({action:'transition',id:c.id,status,comment:'Decisão QA isolada'},'/api/academy');
  await api({action:'entry',kind:'modulo',id:module.id,title:'Alteração publicada',status:'publicado',revision:module.revision,body:module.body},'/api/workspace',400);
  const publicState=await guest();assert(!publicState.text.includes('Explicação QA'));assert(!publicState.text.includes('"answer"'));assert.equal(publicState.data.entries.find(e=>e.id===pre.id).body.questionTotal,4);checks+=3;
- const enrollment=await guest({action:'enroll',courseId:c.id},'/api/academy');const cookie=enrollment.response.headers.get('set-cookie').split(';')[0],eid=enrollment.data.id;
- const other=await guest({action:'enroll',courseId:c.id},'/api/academy');const otherCookie=other.response.headers.get('set-cookie').split(';')[0];
+ const enrollment=await fixtureEnrollment(c.id);const cookie=enrollment.response.headers.get('set-cookie').split(';')[0],eid=enrollment.data.id;
+ const other=await fixtureEnrollment(c.id);const otherCookie=other.response.headers.get('set-cookie').split(';')[0];
  const start=await guest({action:'assessment_start',enrollmentId:eid,assessmentId:pre.id,requestId:'qa-pre'},'/api/workspace',cookie);assert(start.data.questions.every(q=>!Object.hasOwn(q,'answer')&&!Object.hasOwn(q,'explanation')));checks++;
  assert.equal((await guest({action:'assessment_start',enrollmentId:eid,assessmentId:pre.id,requestId:'qa-pre-again'},'/api/workspace',cookie)).data.id,start.data.id);checks++;
  await guest(null,'/api/workspace?run='+start.data.id,otherCookie,403);
@@ -70,7 +77,7 @@ try{
  const copy=await api({action:'duplicate',id:c.id},'/api/academy');const copied=(await api()).entries.filter(e=>e.id===copy.id||e.body.courseId===copy.id);assert.equal(copied.filter(e=>e.kind==='avaliacao').length,2);assert.equal(copied.filter(e=>e.kind==='modulo').length,1);assert.equal(copied.find(e=>e.kind==='curso').body.notes,'Orientações QA');checks+=3;
  const timed=await save('avaliacao','Pré-teste temporizado QA',{courseId:copy.id,stage:'pre',pass:80,minutes:1,attempts:0,random:true,questionCount:2,questions},'publicado');
  for(const status of ['em_revisao','aprovado','publicado'])await api({action:'transition',id:copy.id,status,comment:'Decisão QA cópia'},'/api/academy');
- const te=await guest({action:'enroll',courseId:copy.id},'/api/academy');const tcookie=te.response.headers.get('set-cookie').split(';')[0];
+ const te=await fixtureEnrollment(copy.id);const tcookie=te.response.headers.get('set-cookie').split(';')[0];
  const tr=(await guest({action:'assessment_start',enrollmentId:te.data.id,assessmentId:timed.id,requestId:'timed-qa'},'/api/workspace',tcookie)).data;assert.equal(tr.questions.length,2);assert.equal(new Set(tr.questions.map(q=>q.id)).size,2);checks+=2;
  await db.prepare('UPDATE academy_assessment_runs SET deadline=?,answers=? WHERE id=?').bind('2020-01-01T00:00:00Z','{}',tr.id).run();
  const expired=(await guest({action:'assessment_submit',id:tr.id,answers:correct},'/api/workspace',tcookie)).data;assert.equal(expired.score,0,'Late answers must not replace the saved answers');assert.equal(expired.review.expired,true);checks+=2;
@@ -94,6 +101,6 @@ try{
  resource=await save('recurso',resource.title,resource.body,'arquivado',resource.id,resource.revision);await guest(null,'/api/resource/'+resource.id,'',404);
  assert.equal((await db.prepare('SELECT COUNT(*) n FROM media WHERE id=?').bind(fileId).first()).n,1,'Archiving does not delete source media');checks++;
  assert.equal((await db.prepare('SELECT COUNT(*) n FROM validation_academy_entries').first()).n,0,'Main workspace operations never write validation tables');checks++;
- const pages=await mf.dispatchFetch('http://academy.test/api/administration/workspace',{headers:{Origin:'https://insmisau.github.io',Authorization:'Bearer '+'a'.repeat(64)}});assert.equal(pages.status,200);assert.equal(pages.headers.get('Access-Control-Allow-Origin'),'https://insmisau.github.io');checks+=2;
+ const pages=await mf.dispatchFetch('http://academy.test/api/administration/workspace',{headers:{Origin:'https://insmisau.github.io',Authorization:'Bearer '+'a'.repeat(64)}});assert.equal(pages.status,401);assert.equal(pages.headers.get('Access-Control-Allow-Origin'),'https://insmisau.github.io');checks+=2;
  console.log('Workspace integration: '+checks+' checks passed; institutional records, revisions, public filtering, course modules, pre/post tests, four question types, timers, attempt limits, review reopening, certificate eligibility, copied versions, bulk enrolment, cohorts, attendance, resources and isolation.');
 }finally{await mf.dispose();}
