@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState,type ReactNode} from 'react';
-import {academyAdministration,academyValidation,academyReadJson,academyFetch,setTeamAccess,setAdministrationSession,clearTeamAccess,beginParticipant,participantScope,hasExternalSession,academyManagement,hasTeamAccess} from '@/lib/academy-client';
+import {academyAdministration,academyValidation,academyReadJson,academyFetch,setTeamAccess,setAdministrationSession,setParticipantSession,clearTeamAccess,beginParticipant,participantScope,hasExternalSession,academyManagement,hasTeamAccess} from '@/lib/academy-client';
 
 export function TeamGate({children}:{children:ReactNode}){
  const [ready,setReady]=useState(false),[error,setError]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[attempt,setAttempt]=useState(0),[checking,setChecking]=useState(true),[busy,setBusy]=useState(false);
@@ -41,7 +41,7 @@ export function TeamGate({children}:{children:ReactNode}){
  if(ready)return children;
  return <main className="ins-team-access"><h1>Administração da Academia</h1>{checking?<p role="status">A abrir a Academia…</p>:<>
  {error&&<p role="alert">{error}</p>}
- <form className="form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const response=await academyFetch('/api/administration-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const result=await response.json() as {session:string;expires:number;error?:string};if(!response.ok)throw Error(result.error||'Não foi possível entrar.');setAdministrationSession(result.session,result.expires);setPassword('');setAttempt(n=>n+1);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
+ <form className="form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const response=await academyFetch('/api/administration-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const result=await response.json() as {session:string;expires:number;administration?:boolean;error?:string};if(!response.ok)throw Error(result.error||'Não foi possível entrar.');setAdministrationSession(result.session,result.expires);if(result.administration)setParticipantSession(result.session);setPassword('');setAttempt(n=>n+1);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
  <label className="field"><span>Email</span><input className="ins-team-key" type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/></label>
  <label className="field"><span>Palavra-passe</span><input className="ins-team-key" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/></label>
  <button className="button-link" type="submit" disabled={busy}>{busy?'A entrar…':'Entrar'}</button>

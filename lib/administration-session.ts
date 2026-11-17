@@ -1,9 +1,11 @@
 import {env} from 'cloudflare:workers';
 import {newVisitorToken} from '@/db/access';
 import {digest,externalPrefix} from './registration-session';
-import {passwordMatches} from './academy-password';
+import {passwordMatches,passwordHash,validPassword} from './academy-password';
 import {limitedText} from './registration-identity';
 import {permittedOrigin} from './academy-cors';
+import {openAdministrationRegistration} from './administration-phase';
+import {newSession} from './academy-account';
 
 type Administrator={id:string;email:string;name:string;passwordHash:string};
 function administrators():Administrator[]{
@@ -19,6 +21,10 @@ export async function administrationAccess(req:Request){
  if(!/^[a-f0-9]{64}$/.test(token)||!token.startsWith(externalPrefix))return null;
  const session=await database().prepare('SELECT account,email,expires FROM registration_sessions WHERE token=? AND expires>?').bind(await digest(token),Date.now()).first<{account:string;email:string;expires:number}>();
  if(!session)return null;
+ if(openAdministrationRegistration()){
+  const account=await database().prepare('SELECT id,name,email FROM academy_accounts WHERE id=? AND email=?').bind(session.account,session.email).first<{id:string;name:string;email:string}>();
+  if(account)return {id:account.id,label:account.name,email:account.email,expires:session.expires};
+ }
  const configured=administrators().find(a=>a.email.toLowerCase()===session.email);
  if(!configured||session.account!==await sessionAccount(configured))return null;
  return {id:'administrator:'+configured.id,label:configured.name,email:configured.email,expires:session.expires};
@@ -38,7 +44,20 @@ export async function postAdministrationSession(req:Request){try{
  if(!await limit('admin-ip:'+await digest(ip),60)||!await limit('admin-email:'+await digest(email),10))return reply({error:'Aguarde alguns minutos antes de voltar a tentar.'},429);
  const administrator=administrators().find(a=>a.email.toLowerCase()===email);
  const valid=await passwordMatches(input.password,administrator?.passwordHash||'scrypt:16384:8:5:'+'0'.repeat(32)+':'+'0'.repeat(64));
- if(!administrator||!valid)return reply({error:'Email ou palavra-passe incorrectos.'},401);
+ if(!administrator||!valid){
+  if(!openAdministrationRegistration())return reply({error:'Email ou palavra-passe incorrectos.'},401);
+  type Account={id:string;name:string;email:string;password:string;verified:number};
+  let account=await database().prepare('SELECT id,name,email,password,verified FROM academy_accounts WHERE email=?').bind(email).first<Account>();
+  if(!account){
+   if(!validPassword(input.password))return reply({error:'Escolha uma palavra-passe entre 15 e 256 caracteres. Pode usar uma frase.'},422);
+   const hash=await passwordHash(input.password);
+   // The email is the supplied display value; no name or institutional role is invented.
+   await database().prepare('INSERT OR IGNORE INTO academy_accounts(id,email,name,password,verified,created) VALUES(?,?,?,?,0,?)').bind('account:'+crypto.randomUUID(),email,email,hash,new Date().toISOString()).run();
+   account=await database().prepare('SELECT id,name,email,password,verified FROM academy_accounts WHERE email=?').bind(email).first<Account>();
+  }
+  if(!account||!await passwordMatches(input.password,account.password))return reply({error:'Email ou palavra-passe incorrectos.'},401);
+  return reply(await newSession(account));
+ }
  const session=externalPrefix+newVisitorToken().slice(externalPrefix.length),expires=Date.now()+8*3600000;
  await database().prepare('INSERT INTO registration_sessions(token,account,name,email,trusted,expires) VALUES(?,?,?,?,1,?)').bind(await digest(session),await sessionAccount(administrator),administrator.name,email,expires).run();
  return reply({session,expires});

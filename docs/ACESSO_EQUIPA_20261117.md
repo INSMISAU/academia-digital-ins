@@ -62,3 +62,18 @@ As contas configuradas usam o mesmo formulário e têm acesso integral às área
 Verificação: `tests/administration-login.mjs` passou 33 respostas HTTP, com duas contas independentes em base temporária, gestão completa, criação de curso de ensaio, saída, expiração, recusa de sessão de participante e limitação de tentativas. `tests/team-access.mjs` passou 42 respostas, preservando os acessos anteriores e o isolamento dos ensaios. Os testes de apresentação e do cliente e a verificação TypeScript passaram. Não foram usados dados reais nos testes de escrita.
 
 Título do commit: `Unificar a entrada na Administração com email e palavra-passe`.
+
+## Acesso com qualquer email e palavra-passe própria — correcção de 17/11/2026
+
+Percília esclareceu que a entrada não pode ficar limitada ao seu email e que cada pessoa deve usar o próprio email e uma palavra-passe própria, sem partilhar as suas credenciais. A configuração dos perfis fica para depois. Esta orientação substitui a limitação a contas previamente configuradas descrita na secção anterior.
+
+- Na primeira entrada em «Administração», um email válido ainda não registado cria uma conta com a palavra-passe escolhida e entra imediatamente. Nas entradas seguintes usa a mesma palavra-passe. Não existe lista de emails ou domínios autorizados neste modo.
+- «Criar conta» está disponível independentemente da abertura das inscrições nos cursos. Os campos existentes são nome completo, email e palavra-passe (15 a 256 caracteres). Não foi inventado nem preenchido um aviso de privacidade institucional.
+- As contas criadas pelo formulário normal também recebem automaticamente acesso às áreas administrativas existentes. Cada sessão é individual; as palavras-passe ficam protegidas por scrypt e não são partilhadas entre contas.
+- A criação automática usa o email fornecido como apresentação da conta, sem inventar o nome da pessoa. O perfil institucional, a instituição e o MFA não são exigidos neste percurso.
+- O comportamento desta fase é activado por `INS_OPEN_ADMIN_REGISTRATION=1`. Assim, qualquer pessoa que registe um email válido e uma palavra-passe própria recebe administração completa. Quando os perfis forem acordados, desactivar esta opção retira a concessão automática, preservando contas, conteúdos e histórico. A opção não tem uma data automática de encerramento.
+- A conta e os acessos anteriormente entregues foram preservados. Uma tentativa com palavra-passe errada não altera a palavra-passe já guardada.
+
+Auditoria: `tests/open-administration.mjs` passou 35 respostas HTTP em base temporária, com emails de domínios distintos, palavras-passe diferentes, criação na primeira entrada, criação pelo formulário normal, acesso integral sem perfis/MFA, edição de conteúdo por contas diferentes, regresso, saída e activação/desactivação reversível. Os testes de contas e da entrada anterior passaram 33 respostas cada. Os testes de apresentação, do cliente e TypeScript passaram. Não foram criadas contas fictícias no serviço publicado.
+
+Título do commit: `Permitir acesso individual com qualquer email durante o desenvolvimento`.

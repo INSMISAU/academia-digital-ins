@@ -72,6 +72,7 @@ export function setAdministrationSession(token:string,expires:number){
  sessionStorage.setItem(administratorKey,JSON.stringify({token,expires}));
  sessionStorage.removeItem(teamKey);
 }
+export function forgetAdministrationSession(){sessionStorage.removeItem(administratorKey);}
 export function setTeamAccess(value:string){
   const text=value.trim(),key=text.includes('#ologakey=')?text.slice(text.indexOf('#ologakey=')+10):text;
   if(!/^[a-f0-9]{64}$/.test(key))throw Error('Introduza um código de acesso válido.');
@@ -80,7 +81,7 @@ export function setTeamAccess(value:string){
 export function hasTeamAccess(){return !!teamToken();}
 export async function clearTeamAccess(){
  try{await academyFetch('/api/administration-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});}
- finally{sessionStorage.removeItem(administratorKey);sessionStorage.removeItem(teamKey);beginParticipant();location.assign(location.pathname);}
+ finally{forgetAdministrationSession();sessionStorage.removeItem(teamKey);beginParticipant();location.assign(location.pathname);}
 }
 function teamToken(){try{const saved=sessionStorage.getItem(administratorKey);if(saved){const session=JSON.parse(saved);return session.expires>Date.now()&&/^[a-f0-9]{64}$/.test(session.token)?session.token:'';}return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
 export function academyUrl(path: string) {
@@ -102,7 +103,7 @@ export function academyAdministrationUrl(_isAdmin?: boolean) {
 export function academyFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if(academyManagement()&&typeof init.body==='string'&&headers.get('Content-Type')?.includes('application/json')){if(managementInstitution){const body=JSON.parse(init.body);if(!body.institutionId)init={...init,body:JSON.stringify({...body,institutionId:managementInstitution})};}}
-  const active=academyAdministration()?'':currentParticipant();
+  const active=academyAdministration()&&path!=='/api/account'?'':currentParticipant();
   if (active||academyOrigin||academyValidation()) headers.set('Authorization', 'Bearer ' + (active||sessionToken()));
   if(path.startsWith('/api/team-access')||path.startsWith('/api/administration-session')||academyAdministration()||academyValidation()){
     const token=teamToken();if(token)headers.set('X-Academy-Team',token);

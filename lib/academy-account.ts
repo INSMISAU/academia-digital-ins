@@ -9,20 +9,23 @@ import {enabledProviders,limitedText} from './registration-identity';
 import {validPassword,passwordHash,passwordMatches} from './academy-password';
 import {mailAvailable,sendAcademyMail} from './academy-mail';
 import {permittedOrigin} from './academy-cors';
+import {openAdministrationRegistration} from './administration-phase';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 const emailValid=(s:unknown):s is string=>typeof s==='string'&&s.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 async function limit(bucket:string,maximum:number,period:number){const time=Date.now();return !!await db().prepare('INSERT INTO registration_mail_limits(bucket,until,count) VALUES(?,?,1) ON CONFLICT(bucket) DO UPDATE SET count=CASE WHEN until<=? THEN 1 ELSE count+1 END,until=CASE WHEN until<=? THEN excluded.until ELSE until END WHERE until<=? OR count<? RETURNING count').bind(bucket,time+period,time,time,time,maximum).first();}
 export {accountProfile} from './academy-profile';
 import {accountProfile} from './academy-profile';
-async function newSession(account:{id:string;name:string;email:string;verified:number}){
+export async function newSession(account:{id:string;name:string;email:string;verified:number}){
  const session=externalPrefix+newVisitorToken().slice(externalPrefix.length);
- await db().prepare('INSERT INTO registration_sessions(token,account,name,email,trusted,expires) VALUES(?,?,?,?,?,?)').bind(await digest(session),account.id,account.name,account.email,account.verified,Date.now()+8*3600000).run();
- return {session,profile:{name:account.name,email:account.email,verified:!!account.verified}};
+ const expires=Date.now()+8*3600000;
+ await db().prepare('INSERT INTO registration_sessions(token,account,name,email,trusted,expires) VALUES(?,?,?,?,?,?)').bind(await digest(session),account.id,account.name,account.email,account.verified,expires).run();
+ return {session,expires,administration:openAdministrationRegistration()&&!inValidation(),profile:{name:account.name,email:account.email,verified:!!account.verified}};
 }
 export async function getAccount(req:Request){try{
  const profile=await accountProfile(req),state=await registrationStatus(db());
  const owner=profile?'':await keyFor(visitorToken(req)),hasManualLearning=!!owner&&!!await db().prepare('SELECT 1 FROM enrollments WHERE visitorKey=? UNION ALL SELECT 1 FROM academy_registration_forms WHERE owner=? LIMIT 1').bind(owner,owner).first();
- return reply({management:profile&&await roleGrants(profile.account).then(g=>g.length>0)?await mfaInfo(req,profile.account):null,hasManualLearning,profile:profile?{name:profile.name,email:profile.email,verified:!!profile.trusted}:null,registrationOpen:state.open,notice:state.notice,providers:inValidation()?[]:enabledProviders(),recoveryAvailable:mailAvailable()&&!inValidation()});
+ const openAdministration=openAdministrationRegistration();
+ return reply({management:!openAdministration&&profile&&await roleGrants(profile.account).then(g=>g.length>0)?await mfaInfo(req,profile.account):null,administration:openAdministration&&!inValidation(),hasManualLearning,profile:profile?{name:profile.name,email:profile.email,verified:!!profile.trusted}:null,registrationOpen:state.open||openAdministration,notice:state.notice,providers:inValidation()?[]:enabledProviders(),recoveryAvailable:mailAvailable()&&!inValidation()});
 }catch{return reply({error:'Não foi possível consultar a conta. Tente novamente.'},503);}}
 export async function postAccount(req:Request){try{
  if(!permittedOrigin(req)||!req.headers.get('Content-Type')?.startsWith('application/json'))return reply({error:'Pedido não autorizado.'},403);
@@ -34,11 +37,11 @@ export async function postAccount(req:Request){try{
  const email=input.email.trim().toLowerCase(),ip=req.headers.get('CF-Connecting-IP')||'unknown';
  if(!await limit('account-ip:'+await digest(ip),60,900000)||!await limit('account-email:'+await digest(email),10,900000))return reply({error:'Aguarde alguns minutos antes de voltar a tentar.'},429);
  if(input.action==='register'){
-  const state=await registrationStatus(s);if(!state.open)return reply({error:'A criação de contas está temporariamente indisponível.'},503);
+  const state=await registrationStatus(s);if(!state.open&&!openAdministrationRegistration())return reply({error:'A criação de contas está temporariamente indisponível.'},503);
   if(input.notice!==state.notice)return reply({error:'A informação de protecção de dados foi actualizada. Volte a abrir a página.'},409);
   if(typeof input.name!=='string'||!input.name.trim()||input.name.length>200||/[\u0000-\u001f]/.test(input.name))return reply({error:'Indique o seu nome.'},422);
   if(!validPassword(input.password))return reply({error:'Use uma palavra-passe entre 15 e 256 caracteres.'},422);
-  if(inValidation()&&!email.endsWith('@example.invalid'))return reply({error:'Nos testes internos, use um endereço fictício terminado em @example.invalid.'},422);
+  if(inValidation()&&!openAdministrationRegistration()&&!email.endsWith('@example.invalid'))return reply({error:'Nos testes internos, use um endereço fictício terminado em @example.invalid.'},422);
   const id='account:'+crypto.randomUUID(),name=input.name.trim(),hash=await passwordHash(input.password);
   const result=await s.prepare('INSERT OR IGNORE INTO academy_accounts(id,email,name,password,verified,created) VALUES(?,?,?,?,0,?) RETURNING id').bind(id,email,name,hash,new Date().toISOString()).first();
   if(!result)return reply({error:'Não foi possível criar a conta. Se já tem conta, utilize Entrar.'},409);

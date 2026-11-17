@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {academyFetch,academyReadJson,beginParticipant,setParticipantSession,academyValidation} from '@/lib/academy-client';
+import {academyFetch,academyReadJson,beginParticipant,setParticipantSession,setAdministrationSession,forgetAdministrationSession,academyValidation} from '@/lib/academy-client';
 import {startAccess,methods,type Method} from '@/lib/registration-client';
 import './account.css';
 import {ManagementAccess} from './mfa';
@@ -12,11 +12,11 @@ export function AccountPanel({navigate,changed}:{navigate:(view:string)=>void;ch
  useEffect(()=>{let live=true;academyReadJson('/api/account').then(d=>{if(live)setData(d);}).catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[]);
  async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setMessage('');try{
   const result=await accountAction({action:mode,name,email,password,code,notice:data.notice});
-  setPassword('');if(result.session){beginParticipant();setParticipantSession(result.session);await changed();setData(await academyReadJson('/api/account'));navigate('aprender');}
+  setPassword('');if(result.session){beginParticipant();setParticipantSession(result.session);if(result.administration)setAdministrationSession(result.session,result.expires);await changed();setData(await academyReadJson('/api/account'));navigate('aprender');}
   else if(mode==='recover'){setMode('reset');setMessage(result.message);}
   else if(mode==='reset'){setMode('login');setMessage('Palavra-passe actualizada. Entre com a nova palavra-passe.');setCode('');}
  }catch(e){setError(e instanceof Error?e.message:'Não foi possível concluir.');}finally{setBusy(false);}}
- async function logout(){setBusy(true);setError('');try{await accountAction({action:'logout'});beginParticipant();setData(null);await changed();setData(await academyReadJson('/api/account'));setMode('login');setPassword('');setEmail('');}catch(e){setError(e instanceof Error?e.message:'Não foi possível terminar a sessão.');}finally{setBusy(false);}}
+ async function logout(){setBusy(true);setError('');try{await accountAction({action:'logout'});forgetAdministrationSession();beginParticipant();setData(null);await changed();setData(await academyReadJson('/api/account'));setMode('login');setPassword('');setEmail('');}catch(e){setError(e instanceof Error?e.message:'Não foi possível terminar a sessão.');}finally{setBusy(false);}}
  return <section className="academy-account"><div className="page-heading"><div><span className="eyebrow">ACADEMIA DIGITAL DO INS</span><h1>{data?.profile?'Meu perfil':mode==='register'?'Criar conta':mode==='recover'||mode==='reset'?'Recuperar acesso':'Entrar'}</h1></div></div>{error&&<p role="alert" className="editor-error">{error}</p>}{message&&<p role="status">{message}</p>}{!data&&!error&&<p role="status">A carregar…</p>}
  {data?.profile?<div className="panel form"><h2>{data.profile.name}</h2><p>{data.profile.email}</p><div className="row wrap"><Button onClick={()=>navigate('aprender')}>Meus cursos</Button><Button variant="outline" onClick={()=>navigate('certificados')}>Meus certificados</Button><Button variant="outline" disabled={busy} onClick={()=>void logout()}>Terminar sessão</Button></div>{data.management&&<ManagementAccess initial={data.management}/>}</div>:data&&<div className="panel form">
  {data.hasManualLearning&&<Button variant="outline" onClick={()=>navigate('aprender')}>Meus cursos neste acesso</Button>}
