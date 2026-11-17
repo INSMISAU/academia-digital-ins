@@ -66,16 +66,25 @@ export function academyManagement(){return typeof location!=='undefined'&&new UR
 export function academyValidation(){return typeof location!=='undefined'&&new URLSearchParams(location.search).get('validacao')==='1';}
 export function academyParticipantTest(){return academyValidation()&&new URLSearchParams(location.search).get('perfil')==='participante';}
 const teamKey='ins-ologatecnica-access-v1';
+const administratorKey='ins-academia-administration-session-v1';
+export function setAdministrationSession(token:string,expires:number){
+ if(!/^[a-f0-9]{64}$/.test(token)||!Number.isFinite(expires)||expires<=Date.now())throw Error('Sessão inválida.');
+ sessionStorage.setItem(administratorKey,JSON.stringify({token,expires}));
+ sessionStorage.removeItem(teamKey);
+}
 export function setTeamAccess(value:string){
   const text=value.trim(),key=text.includes('#ologakey=')?text.slice(text.indexOf('#ologakey=')+10):text;
-  if(!/^[a-f0-9]{64}$/.test(key))throw Error('Introduza a ligação privada ou o código de acesso da equipa.');
+  if(!/^[a-f0-9]{64}$/.test(key))throw Error('Introduza um código de acesso válido.');
   sessionStorage.setItem(teamKey,key);
 }
 export function hasTeamAccess(){return !!teamToken();}
-export function clearTeamAccess(){sessionStorage.removeItem(teamKey);beginParticipant();location.assign(location.pathname);}
-function teamToken(){try{return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
+export async function clearTeamAccess(){
+ try{await academyFetch('/api/administration-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});}
+ finally{sessionStorage.removeItem(administratorKey);sessionStorage.removeItem(teamKey);beginParticipant();location.assign(location.pathname);}
+}
+function teamToken(){try{const saved=sessionStorage.getItem(administratorKey);if(saved){const session=JSON.parse(saved);return session.expires>Date.now()&&/^[a-f0-9]{64}$/.test(session.token)?session.token:'';}return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
 export function academyUrl(path: string) {
-  if (path.startsWith('/api/')&&!path.startsWith('/api/team-access')) {
+  if (path.startsWith('/api/')&&!path.startsWith('/api/team-access')&&!path.startsWith('/api/administration-session')) {
     if(academyManagement()&&(/^\/api\/(academy|workspace|media|certificate|resource|export)(\/|\?|$)/.test(path)||path.startsWith('/api/registration/settings')))path='/api/management/'+path.slice(5);
     if(academyValidation())path='/api/validation/'+path.slice(5);
     else if(academyAdministration())path='/api/administration/'+path.slice(5);
@@ -95,7 +104,7 @@ export function academyFetch(path: string, init: RequestInit = {}) {
   if(academyManagement()&&typeof init.body==='string'&&headers.get('Content-Type')?.includes('application/json')){if(managementInstitution){const body=JSON.parse(init.body);if(!body.institutionId)init={...init,body:JSON.stringify({...body,institutionId:managementInstitution})};}}
   const active=academyAdministration()?'':currentParticipant();
   if (active||academyOrigin||academyValidation()) headers.set('Authorization', 'Bearer ' + (active||sessionToken()));
-  if(path.startsWith('/api/team-access')||academyAdministration()||academyValidation()){
+  if(path.startsWith('/api/team-access')||path.startsWith('/api/administration-session')||academyAdministration()||academyValidation()){
     const token=teamToken();if(token)headers.set('X-Academy-Team',token);
     if(academyParticipantTest())headers.set('X-Academy-Mode','participant');
   }
@@ -122,7 +131,7 @@ export async function academyReadJson(path: string, timeoutMs = 20_000) {
         let data: any;
         try { data = await response.json(); }
         catch { throw new Error('Não foi possível ler a resposta do servidor. Tente novamente.'); }
-        if (!response.ok) throw new Error(data?.error || 'Não foi possível carregar os dados. Tente novamente.');
+        if (!response.ok) throw Object.assign(new Error(data?.error || 'Não foi possível carregar os dados. Tente novamente.'), {status: response.status});
         return data;
       })(),
       timeout,

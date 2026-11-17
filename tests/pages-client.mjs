@@ -8,13 +8,14 @@ const code = ts.transpileModule(readFileSync('lib/academy-client.ts', 'utf8'), {
   compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022},
 }).outputText;
 const store = new Map();
-const localStorage = {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value)};
+const localStorage = {getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value),removeItem:key=>store.delete(key)};
 let clock = Date.now();
 const requests = [];
+let responseStatus = 200;
 function client(origin, storage = localStorage, search = '') {
   const context = {exports: {}, __ACADEMY_API_ORIGIN__: origin, Headers, crypto: webcrypto,
-    Date: {now: () => clock}, localStorage: storage, sessionStorage: storage, location: {search}, URLSearchParams,
-    fetch: (url, init) => { requests.push({url, init}); return Promise.resolve(new Response('{}')); },
+    Date: {now: () => clock}, localStorage: storage, sessionStorage: storage, location: {search}, URLSearchParams, AbortController, setTimeout, clearTimeout,
+    fetch: (url, init) => { requests.push({url, init}); return Promise.resolve(new Response('{}',{status:responseStatus})); },
   };
   vm.runInNewContext(code, context);
   return context.exports;
@@ -68,6 +69,11 @@ await priv.academyFetch('/api/registration');
 assert.equal(requests.at(-1).init.headers.get('X-Academy-Team'),'f'.repeat(64));
 assert.equal(requests.at(-1).init.headers.get('X-Academy-Mode'),'participant');
 assert.equal(priv.hasTeamAccess(),true);
+responseStatus=401;
+await assert.rejects(priv.academyReadJson('/api/team-access'),error=>error.status===401,'The access screen must distinguish missing credentials from service failures');
+responseStatus=503;
+await assert.rejects(priv.academyReadJson('/api/team-access'),error=>error.status===503);
+responseStatus=200;
 priv.setTeamAccess('  https://insmisau.github.io/academia-digital-ins/?administracao=1#ologakey='+ 'e'.repeat(64)+'  ');
 await priv.academyFetch('/api/registration');
 assert.equal(requests.at(-1).init.headers.get('X-Academy-Team'),'e'.repeat(64),'Existing private links can reopen the technical session');
@@ -79,6 +85,15 @@ const savedBrowserSession=store.get('ins-academia-demo-session-v1');
 priv.beginParticipant();assert.equal(store.get('ins-academia-demo-session-v1'),savedBrowserSession);
 await client(origin).academyFetch('/api/academy');
 assert.equal(requests.at(-1).init.headers.has('X-Academy-Team'),false);
+const administrator=client(origin,localStorage,'?administracao=1');
+administrator.setAdministrationSession('a0ce5510ade0'+'1'.repeat(52),clock+8*3600000);
+assert.equal(store.has('ins-ologatecnica-access-v1'),false);
+await administrator.academyFetch('/api/academy');
+assert.equal(requests.at(-1).url,origin+'/api/administration/academy');
+assert.equal(requests.at(-1).init.headers.get('X-Academy-Team'),'a0ce5510ade0'+'1'.repeat(52));
+assert.equal(administrator.academyUrl('/api/administration-session'),origin+'/api/administration-session');
+clock+=9*3600000;await administrator.academyFetch('/api/academy');
+assert.equal(requests.at(-1).init.headers.has('X-Academy-Team'),false,'Expired administrator sessions do not reopen old private capabilities');
 const html = readFileSync('index.html', 'utf8');
 assert.match(html, /lang="pt-MZ"/);
 for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {

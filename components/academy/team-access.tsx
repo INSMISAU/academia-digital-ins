@@ -1,16 +1,16 @@
 'use client';
 import {useEffect,useState,type ReactNode} from 'react';
-import {academyAdministration,academyValidation,academyReadJson,academyFetch,setTeamAccess,clearTeamAccess,beginParticipant,participantScope,hasExternalSession,academyManagement,hasTeamAccess} from '@/lib/academy-client';
+import {academyAdministration,academyValidation,academyReadJson,academyFetch,setTeamAccess,setAdministrationSession,clearTeamAccess,beginParticipant,participantScope,hasExternalSession,academyManagement,hasTeamAccess} from '@/lib/academy-client';
 
 export function TeamGate({children}:{children:ReactNode}){
- const [ready,setReady]=useState(false),[error,setError]=useState(''),[access,setAccess]=useState(''),[attempt,setAttempt]=useState(0),[checking,setChecking]=useState(true);
+ const [ready,setReady]=useState(false),[error,setError]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[attempt,setAttempt]=useState(0),[checking,setChecking]=useState(true),[busy,setBusy]=useState(false);
  useEffect(()=>{let active=true;
   async function open(){
    setChecking(true);setError('');
    try{
     if(location.hash.startsWith('#ologakey=')){
      const key=location.hash.slice(10);
-     history.replaceState(null,'',location.pathname+location.search+'#gestao');
+     history.replaceState(null,'',location.pathname+location.search+'#painel');
      setTeamAccess(key);
      if(!academyAdministration()&&!academyValidation()){
       location.replace('?administracao=1#painel');return;
@@ -26,23 +26,30 @@ export function TeamGate({children}:{children:ReactNode}){
      }
     }
     if(active)setReady(true);
-   }catch(e){if(active)setError(e instanceof Error?e.message:'Não foi possível abrir a Academia.');}
+   }catch(e){
+    if(active){
+     const status=(e as {status?:number})?.status;
+     // An anonymous first visit is a sign-in screen, not a failed sign-in.
+     if(status===401&&!hasTeamAccess()&&attempt===0)setError('');
+     else setError(status===401?'Acesso inválido ou expirado.':e instanceof Error?e.message:'Não foi possível abrir a Academia.');
+    }
+   }
    finally{if(active)setChecking(false);}
   }
   void open();return()=>{active=false;};
  },[attempt]);
  if(ready)return children;
  return <main className="ins-team-access"><h1>Administração da Academia</h1>{checking?<p role="status">A abrir a Academia…</p>:<>
- <p>Entre com o acesso técnico da equipa para abrir todas as áreas de gestão. Não é necessário definir os perfis do INS para efectuar a validação.</p>
  {error&&<p role="alert">{error}</p>}
- <form className="form" onSubmit={e=>{e.preventDefault();try{setTeamAccess(access);setAccess('');setAttempt(n=>n+1);}catch(e){setError((e as Error).message);}}}>
- <label className="field"><span>Ligação privada ou código de acesso da equipa</span><input className="ins-team-key" type="password" autoComplete="off" spellCheck={false} required value={access} onChange={e=>setAccess(e.target.value)}/></label>
- <button className="button-link" type="submit">Abrir Administração</button>
- </form><p><button className="text-button" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente com o acesso já aberto</button></p><a href="?">Voltar à Academia</a>
+ <form className="form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const response=await academyFetch('/api/administration-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const result=await response.json() as {session:string;expires:number;error?:string};if(!response.ok)throw Error(result.error||'Não foi possível entrar.');setAdministrationSession(result.session,result.expires);setPassword('');setAttempt(n=>n+1);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
+ <label className="field"><span>Email</span><input className="ins-team-key" type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/></label>
+ <label className="field"><span>Palavra-passe</span><input className="ins-team-key" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/></label>
+ <button className="button-link" type="submit" disabled={busy}>{busy?'A entrar…':'Entrar'}</button>
+ </form>{error&&hasTeamAccess()&&<p><button className="text-button" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente</button></p>}<a href="?">Voltar à Academia</a>
  </>}</main>;
 }
 
 export function TeamBar(){
  if(!academyAdministration()&&!academyValidation()&&!hasTeamAccess())return null;
- return <aside className="ins-team-bar" aria-label="Acesso interno da Ologa"><strong>{academyValidation()?'Validação interna · dados fictícios':'Administração da Academia'}</strong><nav><a href="?administracao=1#painel">Administrar Academia</a><a href="?validacao=1#painel">Testar todas as áreas</a><a href="?validacao=1&perfil=participante#catalogo">Testar inscrição e aprendizagem</a><button onClick={clearTeamAccess}>Terminar acesso</button></nav></aside>;
+ return <aside className="ins-team-bar" aria-label="Navegação da administração"><strong>{academyValidation()?'Validação':'Administração'}</strong><nav><a href="?administracao=1#painel">Administrar Academia</a>{academyValidation()?<><a href="?validacao=1#painel">Gestão</a><a href="?validacao=1&perfil=participante#catalogo">Área do participante</a></>:<a href="?">Academia</a>}<button onClick={clearTeamAccess}>Sair</button></nav></aside>;
 }

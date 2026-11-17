@@ -5,6 +5,7 @@ import {withPagesCors} from './academy-cors';
 import {runAdministration} from '@/db/administration';
 import {runValidation} from '@/db/validation';
 import {isAdmin} from '@/db/access';
+import {administrationAccess} from './administration-session';
 
 // Independent, revocable capabilities for the internal technical team.
 // Only hashes live in runtime configuration; no key is embedded in source.
@@ -21,10 +22,10 @@ export async function teamAccess(req:Request):Promise<Access|null>{
 }
 export function withTeam(req:Request,handle:()=>Promise<Response>,validation=false){
  return withPagesCors(req,async()=>{
-  const access=await teamAccess(req);
-  if(!access&&!isAdmin(req))return Response.json({error:'Acesso reservado à equipa técnica. Utilize a sua ligação privada.'},{status:401,headers:{'Cache-Control':'no-store'}});
+  const administrator=await administrationAccess(req),access=administrator||await teamAccess(req);
+  if(!access&&!isAdmin(req))return Response.json({error:'Entre na Administração para continuar.'},{status:401,headers:{'Cache-Control':'no-store'}});
   const traced=async()=>{const response=await handle();if(req.method==='GET'&&req.headers.get('X-Academy-Mode')!=='participant')await log('Consultar administração',new URL(req.url).pathname,response.ok?'Consulta autorizada':'Consulta recusada',response.ok?'permitido':'negado').run();return response;};
-  return runActor(access?'technical:'+access.id:'site-owner','',()=>validation?runValidation(traced,req.headers.get('X-Academy-Mode')!=='participant'):runAdministration(traced));
+  return runActor(administrator?administrator.id:access?'technical:'+access.id:'site-owner','',()=>validation?runValidation(traced,req.headers.get('X-Academy-Mode')!=='participant'):runAdministration(traced));
  });
 }
 
