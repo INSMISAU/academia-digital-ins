@@ -20,14 +20,14 @@ function client(origin, storage = localStorage, search = '') {
   return context.exports;
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
-assert.equal(client(origin).academyAdministrationUrl(false),'?administracao=1#gestao');
-assert.equal(client('').academyAdministrationUrl(false),'?administracao=1#gestao');
-assert.equal(client('').academyAdministrationUrl(true),'?administracao=1#gestao');
+assert.equal(client(origin).academyAdministrationUrl(false),'?administracao=1#painel');
+assert.equal(client('').academyAdministrationUrl(false),'?administracao=1#painel');
+assert.equal(client('').academyAdministrationUrl(true),'?administracao=1#painel');
 // Keep the private capability on its original origin; no email collection or sign-in redirect.
 const hostedAdministration = new URL(client('').academyAdministrationUrl(false),origin);
 assert.equal(hostedAdministration.origin, origin);
 assert.equal(hostedAdministration.searchParams.get('administracao'), '1');
-assert.equal(hostedAdministration.hash, '#gestao');
+assert.equal(hostedAdministration.hash, '#painel');
 assert(!/signin/.test(hostedAdministration.href));
 assert.equal(client(origin).academyPublicUrl,'https://insmisau.github.io/academia-digital-ins/');
 const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
@@ -67,6 +67,14 @@ priv.setTeamAccess('f'.repeat(64));
 await priv.academyFetch('/api/registration');
 assert.equal(requests.at(-1).init.headers.get('X-Academy-Team'),'f'.repeat(64));
 assert.equal(requests.at(-1).init.headers.get('X-Academy-Mode'),'participant');
+assert.equal(priv.hasTeamAccess(),true);
+priv.setTeamAccess('  https://insmisau.github.io/academia-digital-ins/?administracao=1#ologakey='+ 'e'.repeat(64)+'  ');
+await priv.academyFetch('/api/registration');
+assert.equal(requests.at(-1).init.headers.get('X-Academy-Team'),'e'.repeat(64),'Existing private links can reopen the technical session');
+assert.throws(()=>priv.setTeamAccess('invalid'));
+assert.equal(priv.academyAdministrationUrl(),'?validacao=1#painel','Validation navigation stays on validation data');
+assert.equal(client(origin,localStorage,'?gestao=1').academyAdministrationUrl(),'?gestao=1#gestao');
+assert.equal(client(origin,localStorage,'?validacao=1&perfil=participante&gestao=1').academyAdministrationUrl(),'?validacao=1&perfil=participante&gestao=1#gestao');
 const savedBrowserSession=store.get('ins-academia-demo-session-v1');
 priv.beginParticipant();assert.equal(store.get('ins-academia-demo-session-v1'),savedBrowserSession);
 await client(origin).academyFetch('/api/academy');

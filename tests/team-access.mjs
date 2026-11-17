@@ -9,7 +9,7 @@ const require=createRequire(import.meta.url),tmp=await fs.mkdtemp(path.join(os.t
 const {Miniflare}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
 const {build}=await import(require.resolve('esbuild',{paths:[require.resolve('wrangler')]}));
 const outfile=path.join(tmp,'worker.mjs');
-const modules={team:'team-access',admin:'administration/academy',val:'validation/academy',reg:'validation/registration',settings:'administration/registration/settings',privateSettings:'validation/registration/settings',publicReg:'registration'};
+const modules={team:'team-access',admin:'administration/academy',val:'validation/academy',reg:'validation/registration',settings:'administration/registration/settings',privateSettings:'validation/registration/settings',publicReg:'registration',adminWork:'administration/workspace',validationWork:'validation/workspace',access:'administration/access',validationAccess:'validation/access'};
 await build({stdin:{contents:Object.entries(modules).map(([name,url])=>`import * as ${name} from './app/api/${url}/route';`).join('\n')+`const paths={${Object.keys(modules).join(',')}};export default {fetch(r){const m=paths[new URL(r.url).pathname.slice(1)];return m[r.method](r);}}`,resolveDir:process.cwd(),loader:'ts'},outfile,bundle:true,format:'esm',platform:'neutral',external:['cloudflare:workers','node:async_hooks'],tsconfig:'tsconfig.json'});
 const key='1'.repeat(64),expired='2'.repeat(64),hash=s=>createHash('sha256').update(s).digest('hex');
 const mf=new Miniflare({modules:true,script:await fs.readFile(outfile,'utf8'),compatibilityDate:'2026-05-01',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{INS_TEAM_ACCESS:JSON.stringify([{id:'local1',label:'Equipa local',hash:hash(key),expires:Date.now()+600000},{id:'expired',label:'Expirado',hash:hash(expired),expires:Date.now()-1}])}});
@@ -22,12 +22,27 @@ try{
  const db=await mf.getD1Database('DB');
  for(const f of (await fs.readdir('drizzle')).filter(n=>n.endsWith('.sql')).sort())for(const sql of (await fs.readFile('drizzle/'+f,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
  await db.prepare("INSERT INTO courses(id,title,summary,category,status,hours,pass,version,external,updated) VALUES('ficha-teste','Curso existente','','','publicado',1,80,1,NULL,'2026-11-16')").run();
- for(const route of ['team','admin','val','reg','privateSettings'])await call(route,401,{team:''});
+ for(const route of ['team','admin','val','reg','privateSettings','adminWork','validationWork','access','validationAccess'])await call(route,401,{team:''});
  await call('team',401,{team:expired});await call('team',401,{team:'3'.repeat(64)});await call('team',403,{origin:'https://untrusted.invalid'});
  await call('team',200);await call('team',200,{method:'POST'});await call('team',200,{method:'POST'});
  assert.equal((await db.prepare('SELECT count(*) n FROM validation_courses WHERE id="ficha-teste"').first()).n,1);
  assert.equal((await call('admin',200)).isAdmin,true);
  assert.equal((await call('val',200)).isAdmin,true);
+ for(const route of ['admin','val']){const all=await call(route,200);assert.equal(all.allowedViews,undefined);assert.equal(all.roleManagement,undefined);}
+ for(const route of ['adminWork','validationWork'])assert(Array.isArray((await call(route,200)).entries));
+ for(const route of ['access','validationAccess'])assert.equal((await call(route,200)).global,true);
+ // Technical team can create and review courses without institutional roles or MFA.
+ assert.equal((await db.prepare('SELECT count(*) n FROM academy_roles').first()).n,0);
+ assert.equal((await db.prepare('SELECT count(*) n FROM academy_mfa').first()).n,0);
+ const created=await call('val',200,{method:'POST',body:{action:'course',title:'Ensaio técnico',summary:'Dados fictícios',category:'Ensaio',hours:1,pass:80}});
+ assert(created.id);
+ await call('val',200,{method:'POST',body:{action:'lesson',courseId:created.id,module:'Módulo de ensaio',title:'Aula de ensaio',body:'Conteúdo fictício'}});
+ await call('val',200,{method:'POST',body:{action:'question',courseId:created.id,prompt:'Questão de ensaio',options:['A','B'],answer:0,explanation:'Ensaio'}});
+ await call('val',200,{method:'POST',body:{action:'transition',id:created.id,status:'em_revisao',comment:'Ensaio'}});
+ await call('val',200,{method:'POST',body:{action:'transition',id:created.id,status:'aprovado',comment:'Ensaio'}});
+ await call('val',200,{method:'POST',body:{action:'transition',id:created.id,status:'publicado',comment:'Ensaio'}});
+ assert.equal(await db.prepare('SELECT id FROM courses WHERE id=?').bind(created.id).first(),null);
+
  assert.equal((await call('val',200,{participant:true})).isAdmin,false);
  await call('val',403,{method:'POST',participant:true,body:{action:'seed'}});
  await call('privateSettings',403,{participant:true});

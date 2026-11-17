@@ -66,7 +66,12 @@ export function academyManagement(){return typeof location!=='undefined'&&new UR
 export function academyValidation(){return typeof location!=='undefined'&&new URLSearchParams(location.search).get('validacao')==='1';}
 export function academyParticipantTest(){return academyValidation()&&new URLSearchParams(location.search).get('perfil')==='participante';}
 const teamKey='ins-ologatecnica-access-v1';
-export function setTeamAccess(key:string){if(!/^[a-f0-9]{64}$/.test(key))throw Error('Ligação privada inválida.');sessionStorage.setItem(teamKey,key);}
+export function setTeamAccess(value:string){
+  const text=value.trim(),key=text.includes('#ologakey=')?text.slice(text.indexOf('#ologakey=')+10):text;
+  if(!/^[a-f0-9]{64}$/.test(key))throw Error('Introduza a ligação privada ou o código de acesso da equipa.');
+  sessionStorage.setItem(teamKey,key);
+}
+export function hasTeamAccess(){return !!teamToken();}
 export function clearTeamAccess(){sessionStorage.removeItem(teamKey);beginParticipant();location.assign(location.pathname);}
 function teamToken(){try{return sessionStorage.getItem(teamKey)||'';}catch{return '';}}
 export function academyUrl(path: string) {
@@ -82,7 +87,7 @@ export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins
 
 // Keep the technical access in the same tab and origin as its private capability.
 export function academyAdministrationUrl(_isAdmin?: boolean) {
-  return academyManagement()?'?gestao=1#gestao':'?administracao=1#gestao';
+  return academyManagement()?(academyValidation()?'?validacao=1&perfil=participante&gestao=1#gestao':'?gestao=1#gestao'):academyValidation()?'?validacao=1#painel':'?administracao=1#painel';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {
