@@ -15,7 +15,7 @@ As leituras completas das sete tabelas comparadas antes e depois da publicação
 
 ## Interface e histórico
 
-O presente commit actualiza a interface compilada e o código no GitHub, partindo de `e557114b3bedf79722ede6d50a3e9867716e8c7a`. A disponibilização da interface depende da conclusão do processamento do GitHub Pages para este commit.
+O commit `c0d60fd4cfd51acb1eeea8478d2e9bd22737dd91` actualizou a interface compilada e o código no GitHub, partindo de `e557114b3bedf79722ede6d50a3e9867716e8c7a`. O processamento do GitHub Pages terminou com sucesso: https://github.com/INSMISAU/academia-digital-ins/actions/runs/44178285555.
 
 O HTML aponta para `assets/index-BZPXd3Lv.js` e `assets/index-D93qIc6s.css`. Os recursos anteriormente versionados são preservados. Os ZIPs preparados antes da publicação permanecem como histórico e não precisam de ser carregados sobre esta versão.
 
@@ -28,3 +28,11 @@ O documento `2026-11-17-validacao-antes-publicacao.md` regista os testes, a aber
 `../ESTADO_IMPLEMENTACAO_20261117.md` conserva o estado inicial da preparação dos ZIPs e as pendências funcionais. As referências ali existentes a publicação e validação visual pendentes pertencem àquele momento; os registos posteriores de validação e publicação estão neste histórico.
 
 As restantes pendências documentadas mantêm-se. Esta publicação não declara a Academia integralmente concluída nem substitui os testes gerais da equipa e a aceitação do INS.
+
+## Confirmação após publicação
+
+- Confirmado no navegador o carregamento de https://insmisau.github.io/academia-digital-ins/ com o recurso `index-BZPXd3Lv.js`.
+- Confirmados a página inicial, o curso existente e a ligação ao manual final na biblioteca.
+- Confirmada a apresentação do formulário Administração da Academia, com Email, Palavra-passe e Entrar, e o retorno à página inicial. Não foi efectuado um novo início de sessão nem criados registos na produção nesta verificação.
+- Comparadas as árvores Git: os 89 ficheiros preparados correspondem integralmente aos hashes esperados; nenhum ficheiro anterior foi eliminado; os ficheiros fora da actualização conservaram os hashes anteriores.
+- O presente registo complementar altera apenas documentação. O código e os recursos publicados permanecem os do commit acima.
