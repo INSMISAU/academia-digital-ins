@@ -1215,5 +1215,7 @@
   "Subir módulo": "Move module up",
   "Descer módulo": "Move module down",
   "Seleccione uma ordem de módulos válida.": "Select a valid module order.",
-  "Os módulos foram alterados noutra sessão. Actualize o curso antes de ordenar.": "The modules were changed in another session. Refresh the course before reordering."
+  "Os módulos foram alterados noutra sessão. Actualize o curso antes de ordenar.": "The modules were changed in another session. Refresh the course before reordering.",
+  "Desfazer": "Undo",
+  "Refazer": "Redo"
 }

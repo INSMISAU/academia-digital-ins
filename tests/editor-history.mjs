@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+function module(path){const context={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);return context.exports;}
+const {editorHistory:reduce,initialEditorHistory:init}=module('lib/academy-editor-history.ts');
+const {moveBlock}=module('lib/academy-content.ts');
+const original={id:'fixture',revision:1,title:'A',status:'rascunho',body:{description:'Resumo',blocks:[{id:'a',text:'A'},{id:'b',text:'B'}],sessions:[{id:'session',title:'Original'}]}};
+const before=JSON.stringify(original);
+let state=init(original);
+assert.equal(reduce(state,{type:'undo'}),state);assert.equal(reduce(state,{type:'redo'}),state);
+state=reduce(state,{type:'edit',form:{...state.form,title:'B'}});
+state=reduce(state,{type:'edit',form:{...state.form,body:{...state.form.body,blocks:moveBlock(state.form.body.blocks,0,1)}}});
+assert.equal(state.form.body.blocks.map(b=>b.id).join(','),'b,a');
+state=reduce(state,{type:'accept',form:{...state.form,revision:2,updated:'server-time'}});
+state=reduce(state,{type:'undo'});assert.equal(state.form.body.blocks.map(b=>b.id).join(','),'a,b');assert.equal(state.form.title,'B');assert.equal(state.form.revision,2);assert.equal(state.form.updated,'server-time');
+state=reduce(state,{type:'undo'});assert.equal(state.form.title,'A');assert.equal(state.form.revision,2);
+state=reduce(state,{type:'redo'});assert.equal(state.form.title,'B');state=reduce(state,{type:'redo'});assert.equal(state.form.body.blocks[0].id,'b');
+state=reduce(state,{type:'undo'});state=reduce(state,{type:'edit',form:{...state.form,title:'New branch'}});assert.equal(state.future.length,0);
+const same=state;state=reduce(state,{type:'edit',form:{...state.form}});assert.equal(state,same);
+for(let i=0;i<70;i++)state=reduce(state,{type:'edit',form:{...state.form,title:String(i)}});assert.equal(state.past.length,50);
+state=reduce(state,{type:'accept',form:{...original,id:'copy',revision:1}});assert.equal(state.past.length,0);assert.equal(state.future.length,0);
+state=reduce(state,{type:'edit',form:{...state.form,title:'Changed'}});state=reduce(state,{type:'reset',form:{...original,revision:8}});assert.equal(state.past.length,0);assert.equal(state.form.revision,8);
+assert.equal(JSON.stringify(original),before,'Editing history must not mutate source records, sessions or block content');
+console.log('Editor history: undo/redo, reordering, revision preservation after save, branching, reset, bounded memory and source preservation passed.');
