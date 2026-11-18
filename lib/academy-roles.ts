@@ -53,10 +53,10 @@ function creation(c:RoleContext,allowed:Role[],requested:unknown){
  const institutions=[...new Set(candidates.map(g=>g.institutionId).filter(Boolean))];const selected=typeof requested==='string'&&requested?requested:institutions.length===1?institutions[0]:'';
  if(!selected||!institutions.includes(selected))throw new PermissionError('Seleccione uma instituição autorizada para criar este registo.');c.creationInstitution=selected;
 }
-export function scopeStatements(kind:string,id:string,courseId=''){
+export function scopeStatements(kind:string,id:string,courseId='',gate?:{table:'courses'|'academy_entries';id:string}){
  const c=roleContext();if(!c)return [];
  const inherited=courseId?c.scopes.get('course:'+courseId):undefined;
- return [db().prepare('INSERT OR IGNORE INTO academy_resource_scopes(kind,resourceId,institutionId,ownerAccount,courseId) VALUES(?,?,?,?,?)').bind(kind,id,inherited?.institutionId||c.creationInstitution,c.account,courseId)];
+ return [db().prepare('INSERT OR IGNORE INTO academy_resource_scopes(kind,resourceId,institutionId,ownerAccount,courseId) SELECT ?,?,?,?,?'+(gate?` WHERE EXISTS(SELECT 1 FROM ${gate.table} WHERE id=?)`:'')).bind(kind,id,inherited?.institutionId||c.creationInstitution,c.account,courseId,...(gate?[gate.id]:[]))];
 }
 export function viewsFor(c:RoleContext){
  if(globalRole(c))return null;
@@ -140,6 +140,8 @@ export async function authorize(c:RoleContext,req:Request,path:string){
    for(const id of [b.body?.programId,...(Array.isArray(b.body?.teacherIds)?b.body.teacherIds:[])].filter(Boolean))if(!canRead(c,'entry',id))deny();
    if(b.body?.fileId&&!canRead(c,'media',b.body.fileId))deny();return;
   }
+  if(a==='editorial_bulk'){if(!Array.isArray(b.items)||!b.items.length||b.items.length>50)deny();for(const item of b.items){requirePermission(c,admins,'entry',item.id,true);const entry=c.entries.get(item.id);if(!entry||entry.kind!==b.kind)deny();}return;}
+  if(a==='module_reuse'){requirePermission(c,editors,'course',b.courseId,true);requirePermission(c,editors,'course',b.sourceCourseId);return;}
   if(a==='lesson_order'||a==='module_order'){requirePermission(c,editors,'course',b.courseId,true);return;}
   if(a==='enroll_bulk'){requirePermission(c,managers,'course',b.courseId);c.creationInstitution=c.scopes.get('course:'+b.courseId)?.institutionId||'';return;}
   if(['cohort_member','attendance'].includes(a)){requirePermission(c,a==='attendance'?people:managers,'cohort',b.cohortId);requirePermission(c,a==='attendance'?people:managers,'enrollment',b.enrollmentId);return;}

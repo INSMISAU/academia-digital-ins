@@ -1,3 +1,5 @@
+import {reuseModule} from '@/lib/academy-module-reuse';
+import {editorialBulk} from '@/lib/academy-editorial-bulk';
 import {AcademyError} from '@/lib/academy/core';
 import {reorderModules} from '@/lib/academy-module-order';
 import {imageVariants} from '@/lib/academy-image-metadata';
@@ -133,11 +135,13 @@ async function write(req:Request){
   statements.push(db().prepare('INSERT INTO audit (id,action,entity,detail,created,actor,institution) SELECT ?,?,?,?,?,?,? WHERE changes()>0').bind(uid(),r.stage==='pre'?'Submeter pré-teste':'Submeter pós-teste',r.enrollmentId,result.score+'%',submitted,auditActor().id,auditActor().institution));await db().batch(statements);return json(runView(await one('SELECT * FROM academy_assessment_runs WHERE id=?',r.id)));
  }
  if(!admin)fail('Operação reservada à administração.',403);
+ if(a==='editorial_bulk')return json(await editorialBulk(b));
  if(a==='entry'){
   if(editorialKinds.includes(b.kind))return json(await saveEditorial(b));
   if(!entryKinds.includes(b.kind))fail('Tipo de registo inválido.');const kind=b.kind as EntryKind;const id=b.id?str(b.id,100):uid();const title=str(b.title,200);const status=['rascunho','publicado','arquivado'].includes(b.status)?b.status:'rascunho';const revision=num(b.revision||0);const old=await one('SELECT * FROM academy_entries WHERE id=?',id);
   if(old&&(old.kind!==kind||old.revision!==revision)||!old&&revision!==0)fail('Este registo foi actualizado noutra sessão. Reabra-o antes de guardar.',409);
   const body=await cleanEntry(kind,b.body,status,id),t=now();
+  if(kind==='curso'&&old){const previous=JSON.parse(old.payload);for(const key of ['semanticVersion','versionRoot','parentCourseId','parentVersion'])if(previous[key]!==undefined)(body as any)[key]=previous[key];}
   if(kind==='modulo'){
    str(title,160);
    if(old&&JSON.parse(old.payload).courseId!==body.courseId)fail('O módulo deve permanecer no curso em que foi criado.');
@@ -152,6 +156,7 @@ async function write(req:Request){
   if(kind==='modulo'&&old&&old.title!==title)await db().prepare('UPDATE lessons SET module=? WHERE courseId=? AND module=?').bind(title,body.courseId,old.title).run();
   await db().batch([log('Guardar '+kind,id,title)]);return json({entry:await entry(id)});
  }
+ if(a==='module_reuse')return json(await reuseModule(b));
  if(a==='module_order'){
   const courseId=str(b.courseId,100);await draft(courseId);return json(await reorderModules(courseId,b.modules));
  }

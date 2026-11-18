@@ -41,6 +41,14 @@ try{
  await call('/academy',{action:'transition',id:'a',status:'em_revisao',comment:'Submissão'},200,'trainer');await call('/academy',{action:'transition',id:'a',status:'aprovado',comment:'Auto-aprovação'},403,'trainer');await call('/academy',{action:'transition',id:'a',status:'aprovado',comment:'Revisto'},200,'reviewer');await call('/academy',{action:'transition',id:'a',status:'publicado',comment:'Publicar'},403,'trainer');await call('/academy',{action:'transition',id:'a',status:'publicado',comment:'Publicar'},200,'adminA');
  await call('/workspace',{action:'attendance',cohortId:'c2',enrollmentId:'e2',sessionDate:'2026-11-16',state:'presente'},403,'cohort');
  await call('/workspace',{action:'cohort_member',cohortId:'c1',enrollmentId:'e2'},403,'adminA');
+ for(const [id,institution] of [['newsA',A],['newsB',B]]){await db.prepare("INSERT INTO academy_entries(id,kind,title,status,payload,revision,created,updated) VALUES(?,'noticia',?,'publicado',?,1,'2026-11-18','2026-11-18')").bind(id,id,JSON.stringify({slug:id,description:'Fictitious approved text'})).run();await technical({action:'scope',kind:'entry',resourceId:id,institutionId:institution},200);}
+ for(const user of ['trainer','manager','reviewer'])await call('/workspace',{action:'editorial_bulk',kind:'noticia',status:'em_revisao',items:[{id:'newsA',revision:1}]},403,user);
+ await call('/workspace',{action:'editorial_bulk',kind:'noticia',status:'arquivado',items:[{id:'newsA',revision:1},{id:'newsB',revision:1}]},403,'adminA');
+ assert.equal((await db.prepare("SELECT revision FROM academy_entries WHERE id='newsA'").first()).revision,1);
+ await call('/workspace',{action:'editorial_bulk',kind:'noticia',status:'em_revisao',items:[{id:'newsA',revision:1}]},200,'adminA');
+ await call('/workspace',{action:'module_reuse',courseId:'a2',sourceCourseId:'b',moduleId:'unknown',revision:1},403,'adminA');
+ await call('/workspace',{action:'module_reuse',courseId:'b',sourceCourseId:'a',moduleId:'unknown',revision:1},403,'trainer');
+ await call('/academy',{action:'duplicate',id:'b',bump:'minor'},403,'adminA');
  await call('/workspace',{action:'module_order',courseId:'b',modules:[]},403,'trainer');
  await call('/workspace',{action:'module_order',courseId:'a',modules:[]},403,'manager');
  await call('/workspace',{action:'module_order',courseId:'a',modules:[]},403,'reviewer');
@@ -52,6 +60,10 @@ try{
  await call('/academy',null,403,'trainer',{Origin:'https://untrusted.invalid'});await call('/validation/academy',null,401,'trainer');
  const created=await call('/academy',{action:'course',title:'Novo',summary:'Resumo',category:'Cat',hours:1,pass:80},200,'adminA');assert.equal((await db.prepare("SELECT institutionId FROM academy_resource_scopes WHERE kind='course' AND resourceId=?").bind(created.id).first()).institutionId,A);
  await call('/academy?course='+created.id,null,403,'trainer');
+ const versionA=await call('/academy',{action:'duplicate',id:'a',bump:'minor'},200,'adminA');assert.equal(versionA.versionLabel,'1.1');assert.equal((await db.prepare("SELECT institutionId FROM academy_resource_scopes WHERE kind='course' AND resourceId=?").bind(versionA.id).first()).institutionId,A);assert.equal((await db.prepare("SELECT institutionId FROM academy_resource_scopes WHERE kind='entry' AND resourceId=?").bind(versionA.id).first()).institutionId,A);await call('/academy?course='+versionA.id,null,200,'adminA');await call('/academy?course='+versionA.id,null,403,'trainer');
+ await db.prepare("INSERT INTO academy_entries(id,kind,title,status,payload,revision,created,updated) VALUES('reuse-source','modulo','Reusable','publicado',?,1,'2026-11-18','2026-11-18')").bind(JSON.stringify({courseId:'a',prerequisiteModules:[],position:0})).run();
+ const reusedA=await call('/workspace',{action:'module_reuse',sourceCourseId:'a',courseId:created.id,moduleId:'reuse-source',revision:1},200,'adminA');assert.equal(reusedA.modules,1);const copiedModule=await db.prepare("SELECT id FROM academy_entries WHERE kind='modulo' AND json_extract(payload,'$.courseId')=?").bind(created.id).first();assert.equal((await db.prepare("SELECT institutionId FROM academy_resource_scopes WHERE kind='entry' AND resourceId=?").bind(copiedModule.id).first()).institutionId,A);
+
  await call('/export',{format:'csv',ids:['e2']},403,'adminA');await call('/export',{format:'csv',ids:['e1']},200,'adminA');await call('/export',{format:'xlsx',ids:['e2']},403,'cohort');
  await call('/workspace',{action:'entry',kind:'avaliacao',id:'evil',title:'Intrusão',status:'rascunho',body:{courseId:'b'}},403,'trainer');
  await call('/workspace?history=missing',null,403,'trainer');
