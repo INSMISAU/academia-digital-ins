@@ -1,9 +1,10 @@
 import {db,one,all,now,uid,text,integer,url,dateTime,ids,list,slug,fail,actor,audit} from './core';
 import {encodeLesson,lessonContent} from '@/lib/academy-content';
 import {scopeStatements} from '@/lib/academy-roles';
+function editorialBlocks(raw:unknown){try{return encodeLesson(lessonContent(raw));}catch(e){fail(e instanceof Error?e.message:'Conteúdo inválido.');}}
 export const editorialKinds=['noticia','evento','anuncio'];
 export async function cleanEditorial(kind:string,v:any,status:string){
- const b:any={description:text(v.description,20000),category:text(v.category,120),tags:text(v.tags,500),imageUrl:url(v.imageUrl),imageId:text(v.imageId,100),imageAlt:text(v.imageAlt,500),imageCredit:text(v.imageCredit,500),slug:slug(v.slug||v.title),author:text(v.author,200),seoTitle:text(v.seoTitle,70),seoDescription:text(v.seoDescription,170),visibility:v.visibility==='privado'?'privado':'publico',publishAt:dateTime(v.publishAt),expiresAt:dateTime(v.expiresAt),blocks:v.blocks?encodeLesson(lessonContent(v.blocks)):''};
+ const b:any={description:text(v.description,20000),category:text(v.category,120),tags:text(v.tags,500),imageUrl:url(v.imageUrl),imageId:text(v.imageId,100),imageAlt:text(v.imageAlt,500),imageCredit:text(v.imageCredit,500),slug:slug(v.slug||v.title),author:text(v.author,200),seoTitle:text(v.seoTitle,70),seoDescription:text(v.seoDescription,170),visibility:v.visibility==='privado'?'privado':'publico',publishAt:dateTime(v.publishAt),expiresAt:dateTime(v.expiresAt),blocks:v.blocks?editorialBlocks(v.blocks):''};
  if(b.imageId&&!await one('SELECT mediaId FROM academy_media_details WHERE mediaId=?',b.imageId))fail('Imagem não encontrada.');
  if(['publicado','agendado','em_revisao'].includes(status)&&(!b.description&&!b.blocks))fail('Adicione o conteúdo da publicação.');
  if(b.expiresAt&&b.publishAt&&b.expiresAt<=b.publishAt)fail('O fim da publicação deve ser posterior ao início.');

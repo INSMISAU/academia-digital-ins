@@ -1,0 +1,20 @@
+// The administration fixture is only in this isolated test worker.
+import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import {pathToFileURL} from 'node:url';import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),{build}=require(require.resolve('esbuild',{paths:[require.resolve('wrangler')]}));
+const {Miniflare}=await import(pathToFileURL(require.resolve('miniflare',{paths:[require.resolve('wrangler')]})).href);
+const {outputFiles}=await build({stdin:{contents:`import {POST} from './app/api/workspace/route';import {runAdministration} from './db/administration';export default {fetch(r){return r.headers.get('X-Test-Management')==='yes'?runAdministration(()=>POST(r)):POST(r);}}`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',mainFields:['module','main'],external:['cloudflare:workers','node:async_hooks'],tsconfig:'tsconfig.json'});
+const mf=new Miniflare({modules:[{type:'ESModule',path:path.resolve('.sites-runtime/advanced-api-worker.mjs'),contents:outputFiles[0].text}],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],cf:false});
+const prefix='INS_ACADEMY_LESSON_V1\n',blocks=[{id:'table',type:'table',text:'Cabeçalho\tValor\nLinha\t'},{id:'gallery',type:'gallery',text:'https://example.test/a.png\tDescrição\tFonte\tLegenda'},{id:'divider',type:'divider',text:''},{id:'formatted',type:'formatted',text:'**Forte** [Ligação](https://example.test)'}].map(b=>({id:b.id,type:b.type,text:b.text,url:'',title:'',alt:'',source:''}));
+const body=prefix+JSON.stringify({align:'left',blocks});
+async function post(value,status=200,admin=true){const r=await mf.dispatchFetch('https://unit.invalid/api/workspace',{method:'POST',headers:{Origin:'https://unit.invalid','Content-Type':'application/json',...(admin?{'X-Test-Management':'yes'}:{})},body:JSON.stringify(value)});const d=await r.json();assert.equal(r.status,status,JSON.stringify(d));return d;}
+try{const db=await mf.getD1Database('DB');for(const n of(await fs.readdir('drizzle')).filter(n=>n.endsWith('.sql')).sort())for(const sql of(await fs.readFile('drizzle/'+n,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+ const request={action:'entry',kind:'noticia',title:'Publicação fictícia',status:'publicado',body:{slug:'fixture',blocks:body}};
+ await post(request,403,false);const first=await post(request);assert.equal(first.entry.body.blocks,body);
+ const saved=await db.prepare('SELECT payload FROM academy_entries WHERE id=?').bind(first.entry.id).first();assert.equal(JSON.parse(saved.payload).blocks,body);
+ const published=await db.prepare('SELECT payload FROM academy_editorial_publications WHERE entryId=?').bind(first.entry.id).first();assert.equal(JSON.parse(published.payload).body.blocks,body);
+ const nextBody=prefix+JSON.stringify({align:'left',blocks:[...blocks].reverse()});const next=await post({...first.entry,action:'entry',status:'rascunho',body:{...first.entry.body,blocks:nextBody}});assert.equal(next.entry.body.blocks,nextBody);assert.equal(next.entry.revision,2);
+ assert.equal(JSON.parse((await db.prepare('SELECT payload FROM academy_editorial_publications WHERE entryId=?').bind(first.entry.id).first()).payload).body.blocks,body,'Draft editing preserves the approved publication');
+ assert.equal((await db.prepare('SELECT count(*) n FROM academy_entry_history WHERE entryId=?').bind(first.entry.id).first()).n,1);
+ const bad=prefix+JSON.stringify({align:'left',blocks:[{...blocks[1],text:'javascript:alert(1)\tDescrição\tFonte\t'}]});const denied=await post({...next.entry,action:'entry',body:{...next.entry.body,blocks:bad}},400);assert.match(denied.error,/HTTPS/);assert.equal((await db.prepare('SELECT revision FROM academy_entries WHERE id=?').bind(first.entry.id).first()).revision,2);
+ console.log('Advanced editor API: persisted/reopened blocks, published content preserved during draft edits, revisions/history, guest denial and safe validation passed.');
+}finally{await mf.dispose();}

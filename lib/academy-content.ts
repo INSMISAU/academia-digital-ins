@@ -10,6 +10,7 @@ export type CourseOverview = {
 export const blockLabels = {
   text: 'Texto', richtext: 'Texto formatado', notice: 'Nota / orientação', heading: 'Título de secção', list: 'Lista', image: 'Imagem',
   video: 'Vídeo', audio: 'Áudio', pdf: 'PDF', presentation: 'Apresentação', document: 'Documento', link: 'Ligação',
+  formatted: 'Texto com ligações', heading2: 'Título H2', heading3: 'Título H3', heading4: 'Título H4', orderedlist: 'Lista numerada', quote: 'Citação', divider: 'Separador', table: 'Tabela', gallery: 'Galeria',
 };
 export type BlockType = keyof typeof blockLabels;
 export type ContentBlock = {
@@ -58,7 +59,7 @@ export function lessonContent(raw: unknown): LessonContent {
 function cleanEnglishLesson(raw:any,blocks:ContentBlock[]):LessonEnglish{
  const en:LessonEnglish={};for(const k of ['title','module'] as const)if(typeof raw?.[k]==='string'&&raw[k].trim())en[k]=raw[k].trim();
  const translated:NonNullable<LessonEnglish['blocks']>={};
- for(const block of blocks){const fields:Partial<Pick<ContentBlock,'text'|'title'|'alt'>>={};for(const key of ['text','title','alt'] as const)if(typeof raw?.blocks?.[block.id]?.[key]==='string'&&raw.blocks[block.id][key].trim())fields[key]=raw.blocks[block.id][key].trim();if(Object.keys(fields).length)translated[block.id]=fields;}
+ for(const block of blocks){const fields:Partial<Pick<ContentBlock,'text'|'title'|'alt'>>={};for(const key of ['text','title','alt'] as const)if(typeof raw?.blocks?.[block.id]?.[key]==='string'&&raw.blocks[block.id][key].trim())fields[key]=key==='text'&&['table','gallery'].includes(block.type)?raw.blocks[block.id][key]:raw.blocks[block.id][key].trim();if(Object.keys(fields).length)translated[block.id]=fields;}
  if(Object.keys(translated).length)en.blocks=translated;return en;
 }
 export function localisedLesson(raw:unknown,language:'pt'|'en'):LessonContent{const base=lessonContent(raw),en=base.translations?.en;return language==='en'&&en?{...base,blocks:base.blocks.map(b=>({...b,...en.blocks?.[b.id]}))}:base;}
@@ -94,8 +95,14 @@ export function encodeLesson(input: LessonContent): string {
   const blocks = input.blocks.map((b, i) => {
     if (!Object.hasOwn(blockLabels, b.type) || !b.id || ids.has(b.id)) throw Error('Identificação de bloco inválida.');
     ids.add(b.id);
-    const clean = {...b, text: b.text.trim(), url: b.url.trim(), title: b.title.trim(), alt: b.alt.trim(), source: b.source.trim()};
-    if (['text', 'richtext', 'notice', 'heading', 'list'].includes(b.type)) {
+    const clean = {...b, text: ['table','gallery'].includes(b.type)?b.text.replace(/\r\n/g,'\n'):b.text.trim(), url: b.url.trim(), title: b.title.trim(), alt: b.alt.trim(), source: b.source.trim()};
+    if (b.type === 'table') {
+      validateTable(clean.text);
+    } else if (b.type === 'gallery') {
+      validateGallery(clean.text);
+    } else if (b.type === 'divider') {
+      // No resource or text is required for a separator.
+    } else if (['text', 'richtext', 'notice', 'heading', 'list','formatted','heading2','heading3','heading4','orderedlist','quote'].includes(b.type)) {
       if (!clean.text) throw Error('Preencha o texto do bloco ' + (i + 1) + '.');
     } else {
       if (!safeResourceUrl(clean.url)) throw Error('No bloco ' + (i + 1) + ', use uma ligação HTTPS pública, sem espaços.');
@@ -105,6 +112,7 @@ export function encodeLesson(input: LessonContent): string {
     return clean;
   });
   const en=cleanEnglishLesson(input.translations?.en,blocks);
+  for (const b of blocks) {const translated=en.blocks?.[b.id]?.text;if(translated && b.type==='table')validateTable(translated);if(translated && b.type==='gallery')validateGallery(translated);}
   const encoded = LESSON_FORMAT + JSON.stringify({align: input.align === 'justify' ? 'justify' : 'left', blocks,...(Object.keys(en).length?{translations:{en}}:{})});
   if (encoded.length > 20000) throw Error('Reduza o conteúdo da aula para caber em 20000 caracteres.');
   return encoded;
@@ -127,3 +135,10 @@ export function moduleGroups(lessons: any[]): {name: string; lessons: any[]}[] {
   }
   return groups;
 }
+
+export const advancedBlockTypes = ['formatted','heading2','heading3','heading4','orderedlist','quote','divider','table','gallery'];
+export const tableRows = (text: string): string[][] => text.split('\n').map(row => row.split('\t'));
+export function validateTable(text: string) {const rows=tableRows(text);if(rows.length<2||rows.length>20||rows[0].length<1||rows[0].length>8||rows.some(row=>row.length!==rows[0].length)||rows[0].some(cell=>!cell.trim()))throw Error('A tabela deve ter cabeçalho e dados, até 20 linhas e 8 colunas.');}
+export const galleryItems = (text: string) => text ? text.split('\n').map(row=>{const [url='',alt='',source='',caption='']=row.split('\t');return {url,alt,source,caption};}) : [];
+export function validateGallery(text: string) {const items=galleryItems(text);if(!items.length||items.length>12||items.some(item=>!safeResourceUrl(item.url)||!item.alt.trim()||!item.source.trim()))throw Error('Adicione até 12 imagens com ligação HTTPS, descrição e autoria.');}
+export function insertFormatting(text: string,start: number,end: number,kind: 'bold'|'italic'|'link',url='') {start=Math.max(0,Math.min(text.length,start));end=Math.max(start,Math.min(text.length,end));const selected=text.slice(start,end);if(kind==='link'&&(!selected||!safeResourceUrl(url)))throw Error('Seleccione o texto e indique uma ligação HTTPS válida.');const marker=kind==='bold'?'**':'*';const inserted=kind==='link'?'['+selected.replace(/[\[\]\n]/g,' ')+']('+url.replace(/\(/g,'%28').replace(/\)/g,'%29')+')':marker+selected+marker;return {text:text.slice(0,start)+inserted+text.slice(end),start:start+(kind==='link'?1:marker.length),end:start+(kind==='link'?1:marker.length)+selected.length};}
