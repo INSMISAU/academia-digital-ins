@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';
+let status=200,profile={name:'Pessoa de teste',email:'teste@example.invalid',verified:true},renewed=0,network=false,scope='old',changeDuringRequest=false;
+const client={academyOrigin:'',academyRequestId:()=>'',participantScope:()=>scope,setParticipantSession(){},hasExternalSession:()=>true,beginParticipant(){renewed++;},academyFetch:async()=>{if(changeDuringRequest)scope='new';if(network)throw new TypeError('network');return new Response(JSON.stringify(status===200?profile:{error:'A sessão terminou.'}),{status});}};
+const context={exports:{},require:()=>client,Response,Error,TypeError};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/registration-client.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);
+const c=context.exports;
+assert.equal((await c.restoreRegistrationProfile()).email,profile.email);assert.equal(renewed,0);
+status=401;assert.equal(await c.restoreRegistrationProfile(),undefined);assert.equal(renewed,1);
+status=503;await assert.rejects(c.restoreRegistrationProfile(),e=>e.status===503);assert.equal(renewed,1,'Do not discard a valid account on a service error');
+network=true;await assert.rejects(c.restoreRegistrationProfile(),TypeError);assert.equal(renewed,1);
+network=false;status=401;changeDuringRequest=true;scope='old';await c.restoreRegistrationProfile();assert.equal(renewed,1,'An old response must not clear a newer signed-in session');
+console.log('Registration recovery: valid identity preserved, expired identity renewed, network and service failures do not revoke a valid session.');

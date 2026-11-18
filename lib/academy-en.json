@@ -1210,5 +1210,10 @@
   "Este registo corresponde a um percurso de demonstração.": "This record relates to a demonstration learning pathway.",
   "Este registo confirma a conclusão do curso na Academia.": "This record confirms completion of the course in the Academy.",
   "Não apresenta dados pessoais do participante.": "It does not display the participant's personal data.",
-  "Código não encontrado ou serviço temporariamente indisponível. Confirme o código e tente novamente.": "Code not found or service temporarily unavailable. Check the code and try again."
+  "Código não encontrado ou serviço temporariamente indisponível. Confirme o código e tente novamente.": "Code not found or service temporarily unavailable. Check the code and try again.",
+  "Mover módulo": "Move module",
+  "Subir módulo": "Move module up",
+  "Descer módulo": "Move module down",
+  "Seleccione uma ordem de módulos válida.": "Select a valid module order.",
+  "Os módulos foram alterados noutra sessão. Actualize o curso antes de ordenar.": "The modules were changed in another session. Refresh the course before reordering."
 }

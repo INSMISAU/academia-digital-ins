@@ -1,4 +1,5 @@
 'use client';
+import {AcademyImage} from './image';
 import {tr,getLocale,courseTitle,courseCategory,courseInfo} from '@/components/academy/complete/language';
 import { UiText } from './complete/language';
 import { EditorialEditor } from './complete/editorial';
@@ -114,7 +115,7 @@ export function PublicRecords({ kind, work, courses, onOpen, embedded, includeEb
     return <>{tr(!embedded && <Heading title={tr(labels[kind] || kindNames[kind])}/>)}<div className="workspace-filter"><F label={tr("Pesquisar")}><Input type="search" value={search} onChange={e => setSearch(e.target.value)}/></F><F label={tr("Categoria")}><select value={category} onChange={e => setCategory(e.target.value)}><option value="">{tr("Todas as categorias")}</option>{tr([...new Set(list.map(e => e.body.category).filter(Boolean))].map(c => <option key={c} value={c}>{tr(c)}</option>))}</select></F></div>
  <div className="workspace-records">{tr(showEbook && <EbookResource />)}{tr(items.map(e => <article className="academy-course-card academy-record-card" key={e.id}>
   <div className="academy-course-top"><span className="academy-category">{tr(e.body.category || e.body.specialty || e.body.type || kindNames[kind])}</span><RecordIcon size={25} strokeWidth={1.5} aria-hidden="true"/></div>
-  {tr((e.body.imageId || e.body.imageUrl) && <figure><img className="record-image" src={e.body.imageId ? ImageUrl(e.body.imageId) : e.body.imageUrl} alt={tr(e.body.imageAlt || e.title)} loading="lazy"/>{tr(e.body.imageCredit && <figcaption>{tr(e.body.imageCredit)}</figcaption>)}</figure>)}
+  {tr((e.body.imageId || e.body.imageUrl) && <figure>{e.body.imageId?<AcademyImage className="record-image" imageId={e.body.imageId} variants={e.body.imageVariants} alt={tr(e.body.imageAlt||e.title)} target={kind==='formador'?240:960}/>:<img className="record-image" src={e.body.imageUrl} alt={tr(e.body.imageAlt||e.title)} loading="lazy"/>}{tr(e.body.imageCredit && <figcaption>{tr(e.body.imageCredit)}</figcaption>)}</figure>)}
   <div className="academy-course-content"><h3>{tr(e.title)}</h3>{tr(kind === 'evento' && <p className="meta">{tr(date(e.body.date))}{tr(e.body.ends ? ' a ' + date(e.body.ends) : '')}{tr(" \u00B7 ")}{tr(e.body.location)}</p>)}{tr(kind === 'formador' && <p className="meta">{tr(e.body.institution)}</p>)}<p>{tr(e.body.description?.slice(0, 220))}</p>
    <div className="academy-course-actions">{tr(kind === 'recurso' ? <a className="button-link" href={resourceUrl(e)} target="_blank" rel="noreferrer">{tr("Consultar material")}<ExternalLink size={16}/></a> : <Button variant="outline" onClick={() => setDetail(e)}>{tr("Consultar")}<ArrowRight size={16}/></Button>)}</div>
   </div>

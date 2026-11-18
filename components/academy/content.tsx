@@ -19,7 +19,7 @@ export function LessonContent({ body }: {
     body: string;
 }) {
     const content = lessonInfo(body);
-    return <div lang={getLanguage()==='en'&&content.translations?.en?'en':'pt-MZ'} className={'academy-content align-' + content.align}>{getLanguage()==='en'&&!content.translations?.en&&body.trim()&&<p className="content-note" lang="en">{tr('Sem tradução inglesa disponível. O conteúdo é apresentado em português.')}</p>}{tr(content.blocks.map((b, index) => {
+    return <div lang={getLanguage()==='en'&&content.translations?.en?'en':'pt-MZ'} className={'academy-content align-' + content.align}>{getLanguage()==='en'&&!content.translations?.en&&body.trim()&&null}{tr(content.blocks.map((b, index) => {
             if (b.type === 'text')
                 return <div className="content-text" key={index}>{tr(b.text.split(/\n\s*\n/).map((p, i) => <p key={i}>{tr(p)}</p>))}</div>;
             if (b.type === 'richtext')

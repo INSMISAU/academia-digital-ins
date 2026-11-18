@@ -3,9 +3,15 @@ const pendingKey='ins-ficha-acesso-pendente';
 export const methods={google:'Google',apple:'Apple / iCloud',microsoft:'Microsoft'} as const;
 export type Method=keyof typeof methods;
 export type Profile={name:string;email:string;verified:boolean};
+export class IdentityRequestError extends Error{constructor(message:string,public status:number){super(message);}}
 export async function identity<T extends object={ok:boolean}>(input:Record<string,unknown>):Promise<T>{
  const res=await academyFetch('/api/registration/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});
- const body=await res.json() as T&{error?:string};if(!res.ok)throw Error(body.error||'Não foi possível concluir o acesso.');return body;
+ const body=await res.json() as T&{error?:string};if(!res.ok)throw new IdentityRequestError(body.error||'Não foi possível concluir o acesso.',res.status);return body;
+}
+export async function restoreRegistrationProfile(){
+ const scope=participantScope();
+ try{const profile=await identity<Profile>({action:'profile'});return scope===participantScope()?profile:undefined;}
+ catch(error){if(error instanceof IdentityRequestError&&error.status===401){if(scope===participantScope()&&hasExternalSession())beginParticipant();return undefined;}throw error;}
 }
 export async function startAccess(course:string,provider:Method){
  if(!academyOrigin&&!participantScope())beginParticipant();

@@ -1,6 +1,7 @@
 import {db,one,all,now,uid,fail,text,integer,dateTime,ids,list,courseEntry,principal,enrolled,isAdmin,admin,notification,audit} from './core';
 import {visitorKey,visitorToken,ownsEnrollment} from '@/db/access';
 import {scopeStatements} from '@/lib/academy-roles';
+import {imageVariants} from '@/lib/academy-image-metadata';
 export async function registrationRules(courseId:string,owner:string){
  const b=await courseEntry(courseId),t=now().slice(0,10);if(b.registrationStarts&&t<b.registrationStarts||b.registrationEnds&&t>b.registrationEnds||b.ends&&t>b.ends)fail('O período de inscrição deste curso está encerrado.');
  for(const id of b.prerequisiteCourses||[]){if(!await one("SELECT 1 FROM certificates ct JOIN enrollments e ON e.id=ct.enrollmentId WHERE e.visitorKey=? AND e.courseId=? AND ct.status='valido'",owner,id))fail('Conclua primeiro os cursos definidos como pré-requisitos.');}
@@ -57,4 +58,4 @@ export async function learningAction(req:Request,b:any){
  fail('Operação inválida.');
 }
 
-export async function learningSummary(e:any){const setup=await courseEntry(e.courseId),trainers=[];for(const id of setup.teacherIds||[]){const teacher=await one("SELECT title FROM academy_entries WHERE id=? AND kind='formador' AND status='publicado'",id);if(teacher)trainers.push(teacher.title);}const tasks=await all("SELECT a.id,a.title,json_extract(a.payload,'$.due') due FROM academy_entries a WHERE a.kind='tarefa' AND a.status='publicado' AND json_extract(a.payload,'$.courseId')=? AND NOT EXISTS(SELECT 1 FROM academy_submissions s WHERE s.assignmentId=a.id AND s.enrollmentId=?)",e.courseId,e.id);return {imageId:setup.imageId||'',imageAlt:setup.imageAlt||'',trainers,pendingTasks:tasks,studySeconds:(await one('SELECT COALESCE(SUM(seconds),0) n FROM academy_study_time WHERE enrollmentId=?',e.id)).n};}
+export async function learningSummary(e:any){const setup=await courseEntry(e.courseId),trainers=[];for(const id of setup.teacherIds||[]){const teacher=await one("SELECT title FROM academy_entries WHERE id=? AND kind='formador' AND status='publicado'",id);if(teacher)trainers.push(teacher.title);}const tasks=await all("SELECT a.id,a.title,json_extract(a.payload,'$.due') due FROM academy_entries a WHERE a.kind='tarefa' AND a.status='publicado' AND json_extract(a.payload,'$.courseId')=? AND NOT EXISTS(SELECT 1 FROM academy_submissions s WHERE s.assignmentId=a.id AND s.enrollmentId=?)",e.courseId,e.id);return {imageVariants:await imageVariants(setup.imageId),imageId:setup.imageId||'',imageAlt:setup.imageAlt||'',trainers,pendingTasks:tasks,studySeconds:(await one('SELECT COALESCE(SUM(seconds),0) n FROM academy_study_time WHERE enrollmentId=?',e.id)).n};}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { academyFetch, beginParticipant, hasExternalSession, participantScope, setParticipantSession } from '@/lib/academy-client';
-import { candidate, identity, leaveParticipant, type Profile, type Method } from '@/lib/registration-client';
+import { candidate, restoreRegistrationProfile, leaveParticipant, type Profile, type Method } from '@/lib/registration-client';
 import { AccessOptions, VerifyContact } from './registration-access';
 import { model, sections, districts, cleanAnswers, exempt, isOther, type Answers } from '@/lib/registration';
 import './registration.css';
@@ -36,15 +36,17 @@ export function Registration({ course, notice, close, onSaved, preview = false, 
     const [identityError, setIdentityError] = useState('');
     useEffect(() => { if (preview)
         return; if (initialProfile || !hasExternalSession())
-        return; let live = true; identity<Profile>({ action: 'profile' }).then(r => { if (live) {
+        return; let live = true; restoreRegistrationProfile().then(r => { if (live) {
         setProfile(r);
-        set({ nome: r.name, email: r.email });
+        if(r)set(previous=>({...previous,nome:previous.nome||r.name,email:previous.email||r.email}));
+        else{setManual(true);updateScope(participantScope());}
     } }).catch(() => { if (live)
-        setIdentityError('A sessão terminou. Volte a entrar ou escolha o preenchimento manual.'); }).finally(() => { if (live)
+        setIdentityError('manual'); }).finally(() => { if (live)
         restore(false); }); return () => { live = false; }; }, [preview, initialProfile]);
     async function otherPerson() { if (lock.current)
         return; deleteDraft(); await leaveParticipant().catch(() => { }); updateScope(participantScope()); set({}); setProfile(undefined); setCheckedEmail(''); setManual(true); setIdentityError(''); setReceipt(null); setCopy(false); setConfirmed([false, false]); replacement.current = ''; hasDraft(false); next(0); onSaved(); }
     const [draft, hasDraft] = useState(false);
+    async function continueManually(){await leaveParticipant().catch(()=>{});updateScope(participantScope());setProfile(undefined);setManual(true);setIdentityError('');setCheckedEmail('');setConfirmed([false,false]);}
     const heading = useRef<HTMLHeadingElement>(null), lock = useRef(false);
     const draftKey = 'ins-ficha-rascunho-v1:' + course.id + (scope ? ':' + scope : '');
     useEffect(() => { if (preview)
@@ -136,7 +138,7 @@ export function Registration({ course, notice, close, onSaved, preview = false, 
         close(); }}><DialogContent className="ins-ficha" showCloseButton={!busy}><DialogTitle>{tr("Ficha de inscri\u00E7\u00E3o")}</DialogTitle><DialogDescription>{tr(course.title)}{tr(" \u00B7 Academia do Instituto Nacional de Sa\u00FAde")}</DialogDescription><LanguageSelector/>
  {tr(receipt ? <><h2 tabIndex={-1} ref={heading}>{tr("Inscri\u00E7\u00E3o registada")}</h2><p>{tr("Refer\u00EAncia: ")}<strong>{tr(receipt.reference)}</strong><br />{tr("Data: ")}{tr(new Intl.DateTimeFormat('pt-PT', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Africa/Maputo' }).format(new Date(receipt.created)))}</p>{tr(summary())}{tr(model.declarations.map(line => <p key={line}>{tr(line)}</p>))}<p className="ins-assinatura">{tr("Assinatura, quando aplic\u00E1vel: ______________________________")}</p><div className="ins-actions"><Button onClick={fileCopy}>{tr("Descarregar ficha")}</Button><Button variant="outline" onClick={() => window.print()}>{tr("Imprimir")}</Button><Button variant="outline" onClick={close}>{tr("Fechar")}</Button><Button variant="outline" onClick={() => void otherPerson()}>{tr("Inscrever outra pessoa")}</Button><Button variant="outline" onClick={() => void leaveParticipant().finally(() => { onSaved(); close(); })}>{tr("Terminar sess\u00E3o")}</Button></div></> : <>
  <div className="ins-step">{tr("Etapa ")}{tr(step + 1)}{tr(" de 5")}</div><h2 tabIndex={-1} ref={heading}>{tr(step === 4 ? 'Revisão e declaração' : sections[step])}</h2>
- {tr(step === 0 && <><p>{tr("Os campos com * s\u00E3o obrigat\u00F3rios.")}</p>{tr(unavailable && <p role="status">{tr("A submiss\u00E3o de inscri\u00E7\u00F5es est\u00E1 temporariamente indispon\u00EDvel.")}</p>)}{tr(notice && <details className="ins-privacy"><summary>{tr("Protec\u00E7\u00E3o de dados")}</summary><p className="ins-notice">{tr(notice)}</p></details>)}{tr(!preview && providers.length > 0 && !profile && !manual && !restoring ? <AccessOptions course={course.id} enabled={providers} preview={preview} manual={() => void otherPerson()}/> : null)}{tr(!preview && profile && <p>{tr("Reveja o nome e o email disponibilizados pela sua conta.")}</p>)}{tr(identityError && <p role="alert">{tr(identityError)}</p>)}</>)}
+ {tr(step === 0 && <><p>{tr("Os campos com * s\u00E3o obrigat\u00F3rios.")}</p>{tr(unavailable && null)}{tr(notice && <details className="ins-privacy"><summary>{tr("Protec\u00E7\u00E3o de dados")}</summary><p className="ins-notice">{tr(notice)}</p></details>)}{tr(!preview && providers.length > 0 && !profile && !manual && !restoring ? <AccessOptions course={course.id} enabled={providers} preview={preview} manual={() => void otherPerson()}/> : null)}{tr(!preview && profile && <p>{tr("Reveja o nome e o email disponibilizados pela sua conta.")}</p>)}{tr(identityError && <Button type="button" variant="outline" onClick={()=>void continueManually()}>{tr("Outro / Preencher manualmente")}</Button>)}</>)}
  {tr(step === 1 && a.situacao === 'Sem vínculo institucional' && <p>{tr("Indique a prov\u00EDncia e o distrito de resid\u00EAncia. Os dados institucionais s\u00E3o dispensados.")}</p>)}
  <form noValidate onSubmit={e => { e.preventDefault(); if (step === 4)
             void send();
@@ -155,7 +157,7 @@ export function Registration({ course, notice, close, onSaved, preview = false, 
                     update('certificado', v(a.nome)); setCopy(e.target.checked); }}/>{tr("Usar o nome completo do participante no certificado.")}</label></>)}
   </div>;
             }) : <>{tr(summary())}<p>{tr("Nome que constar\u00E1 no certificado: ")}<strong>{tr(v(a.certificado))}</strong></p>{tr([nameDeclaration, dataDeclaration].map((s, i) => <label key={s} className="ins-check"><input type="checkbox" checked={confirmed[i]} onChange={e => setConfirmed(confirmed.map((b, j) => j === i ? e.target.checked : b))}/>{tr(s)}</label>))}</>)}
- {tr(unavailable && step === 4 && <p>{tr("A submiss\u00E3o de inscri\u00E7\u00F5es est\u00E1 temporariamente indispon\u00EDvel.")}</p>)}<p role="status" className={message ? 'ins-status' : ''}>{tr(message)}</p>
+ {tr(unavailable && step === 4 && null)}<p role="status" className={message ? 'ins-status' : ''}>{tr(message)}</p>
  <div className="ins-actions">{tr(step > 0 && <Button type="button" variant="outline" disabled={busy} onClick={() => next(step - 1)}>{tr("Anterior")}</Button>)}<Button type="submit" disabled={busy || restoring || !!identityError || (step === 4 && (preview || unavailable))}>{tr(step === 4 ? (busy ? 'A registar…' : 'Submeter inscrição') : (step === 3 ? 'Rever ficha' : 'Continuar'))}</Button></div>
  </form>
  {tr(!preview && profile && step === 0 && <Button variant="outline" onClick={() => void otherPerson()}>{tr("Sair desta conta")}</Button>)}{tr(!preview && <details><summary>{tr("Guardar e continuar depois")}</summary><p>{tr("S\u00F3 \u00E9 guardado se escolher esta op\u00E7\u00E3o.")}</p><div className="ins-actions"><Button variant="outline" disabled={busy} onClick={saveDraft}>{tr("Guardar preenchimento")}</Button>{tr(draft && <><Button variant="outline" disabled={busy} onClick={() => { try {

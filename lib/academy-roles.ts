@@ -140,7 +140,7 @@ export async function authorize(c:RoleContext,req:Request,path:string){
    for(const id of [b.body?.programId,...(Array.isArray(b.body?.teacherIds)?b.body.teacherIds:[])].filter(Boolean))if(!canRead(c,'entry',id))deny();
    if(b.body?.fileId&&!canRead(c,'media',b.body.fileId))deny();return;
   }
-  if(a==='lesson_order'){requirePermission(c,editors,'course',b.courseId,true);return;}
+  if(a==='lesson_order'||a==='module_order'){requirePermission(c,editors,'course',b.courseId,true);return;}
   if(a==='enroll_bulk'){requirePermission(c,managers,'course',b.courseId);c.creationInstitution=c.scopes.get('course:'+b.courseId)?.institutionId||'';return;}
   if(['cohort_member','attendance'].includes(a)){requirePermission(c,a==='attendance'?people:managers,'cohort',b.cohortId);requirePermission(c,a==='attendance'?people:managers,'enrollment',b.enrollmentId);return;}
   if(a==='cohort_update'){requirePermission(c,[...managers,'trainer'],'cohort',b.id);return;}

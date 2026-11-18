@@ -1,4 +1,6 @@
 import {AcademyError} from '@/lib/academy/core';
+import {reorderModules} from '@/lib/academy-module-order';
+import {imageVariants} from '@/lib/academy-image-metadata';
 import {editorialKinds,saveEditorial,visibleEntries} from '@/lib/academy/editorial';
 import {cleanLearningEntry,learningAccess} from '@/lib/academy/learning';
 import {auditActor} from '@/db/actor';
@@ -95,6 +97,7 @@ async function read(req:Request){
   entries=await visibleEntries(entries,false);
   entries=entries.filter(e=>e.kind!=='banco_questao'&&e.status==='publicado'&&(!['curso','modulo','avaliacao','tarefa'].includes(e.kind)||published.has(e.kind==='curso'?e.id:e.body.courseId))).map(e=>e.kind==='avaliacao'?{...e,body:{...e.body,questionTotal:e.body.questions.length,questions:undefined}}:e);
  }
+ entries=await Promise.all(entries.map(async e=>e.body.imageId?{...e,body:{...e.body,imageVariants:await imageVariants(e.body.imageId)}}:e));
  return json({entries,members:admin?await all('SELECT * FROM academy_cohort_members'):[],attendance:admin?await all('SELECT * FROM academy_attendance'):[]});
 }
 function runView(r:any){const snap=JSON.parse(r.snapshot);return {id:r.id,enrollmentId:r.enrollmentId,assessmentId:r.assessmentId,stage:r.stage,state:r.state,started:r.started,deadline:r.deadline,examMode:snap.examMode===true,title:snap.title,pass:snap.pass,answers:r.answers?JSON.parse(r.answers):{},score:r.score,submitted:r.submitted,questions:r.state==='active'?snap.questions.map(({answer,explanation,...q}:Question)=>q):[],review:['submitted','pending'].includes(r.state)?JSON.parse(r.review):null};}
@@ -148,6 +151,9 @@ async function write(req:Request){
   statements.push(...scopeStatements('entry',id,kind==='curso'?id:body.courseId||''));const result=await db().batch(statements);if(!result[1].meta.changes)fail('O registo foi alterado noutra sessão. Reabra-o antes de guardar.',409);
   if(kind==='modulo'&&old&&old.title!==title)await db().prepare('UPDATE lessons SET module=? WHERE courseId=? AND module=?').bind(title,body.courseId,old.title).run();
   await db().batch([log('Guardar '+kind,id,title)]);return json({entry:await entry(id)});
+ }
+ if(a==='module_order'){
+  const courseId=str(b.courseId,100);await draft(courseId);return json(await reorderModules(courseId,b.modules));
  }
  if(a==='lesson_order'){
   const courseId=str(b.courseId,100);await draft(courseId);const order=ids(b.ids);const existing=await all('SELECT id FROM lessons WHERE courseId=?',courseId);if(order.length!==existing.length||existing.some(x=>!order.includes(x.id)))fail('A lista de aulas mudou. Reabra o curso antes de ordenar.');
