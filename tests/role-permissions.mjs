@@ -64,6 +64,7 @@ try{
  await db.prepare("INSERT INTO academy_entries(id,kind,title,status,payload,revision,created,updated) VALUES('reuse-source','modulo','Reusable','publicado',?,1,'2026-11-18','2026-11-18')").bind(JSON.stringify({courseId:'a',prerequisiteModules:[],position:0})).run();
  const reusedA=await call('/workspace',{action:'module_reuse',sourceCourseId:'a',courseId:created.id,moduleId:'reuse-source',revision:1},200,'adminA');assert.equal(reusedA.modules,1);const copiedModule=await db.prepare("SELECT id FROM academy_entries WHERE kind='modulo' AND json_extract(payload,'$.courseId')=?").bind(created.id).first();assert.equal((await db.prepare("SELECT institutionId FROM academy_resource_scopes WHERE kind='entry' AND resourceId=?").bind(copiedModule.id).first()).institutionId,A);
 
+ await call('/export',{format:'pdf',paginated:true,language:'pt',inactiveDays:30,filters:[],ids:['e1','e2']},403,'adminA');await call('/export',{format:'pdf',paginated:true,language:'pt',inactiveDays:30,filters:[],ids:['e2']},403,'cohort');await call('/export',{format:'pdf',paginated:true,language:'pt',inactiveDays:30,filters:[],ids:['e1']},200,'manager');
  await call('/export',{format:'csv',ids:['e2']},403,'adminA');await call('/export',{format:'csv',ids:['e1']},200,'adminA');await call('/export',{format:'xlsx',ids:['e2']},403,'cohort');
  await call('/workspace',{action:'entry',kind:'avaliacao',id:'evil',title:'Intrusão',status:'rascunho',body:{courseId:'b'}},403,'trainer');
  await call('/workspace?history=missing',null,403,'trainer');
