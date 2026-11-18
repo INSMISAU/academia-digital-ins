@@ -10,8 +10,11 @@ const contentContext = {exports: {}, URL};
 vm.runInNewContext(ts.transpileModule(readFileSync('lib/academy-content.ts', 'utf8'), {
   compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022},
 }).outputText, contentContext);
+const i18nContext={exports:{},require:()=>({default:JSON.parse(readFileSync('lib/academy-en.json','utf8'))})};
+vm.runInNewContext(ts.transpileModule(readFileSync('lib/academy-i18n.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,i18nContext);
 const context = {exports: {}, URLSearchParams, require: name => {
   if (name === './academy-content') return contentContext.exports;
+  if (name === './academy-i18n') return i18nContext.exports;
   throw Error('Unexpected import: ' + name);
 }};
 vm.runInNewContext(code, context);

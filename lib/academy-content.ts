@@ -5,6 +5,7 @@ export const LESSON_FORMAT = 'INS_ACADEMY_LESSON_V1\n';
 export const modalities = ['Online', 'Presencial', 'Híbrido', 'Auto-aprendizagem', 'Webinar'];
 export type CourseOverview = {
   summary: string; objectives: string; audience: string; prerequisites: string; modality: string;
+  translations?: {en?: Partial<Record<'title'|'category'|'summary'|'objectives'|'audience'|'prerequisites',string>>};
 };
 export const blockLabels = {
   text: 'Texto', richtext: 'Texto formatado', notice: 'Nota / orientação', heading: 'Título de secção', list: 'Lista', image: 'Imagem',
@@ -14,7 +15,8 @@ export type BlockType = keyof typeof blockLabels;
 export type ContentBlock = {
   id: string; type: BlockType; text: string; url: string; title: string; alt: string; source: string;
 };
-export type LessonContent = {align: 'left' | 'justify'; blocks: ContentBlock[]};
+export type LessonEnglish={title?:string;module?:string;blocks?:Record<string,Partial<Pick<ContentBlock,'text'|'title'|'alt'>>>};
+export type LessonContent = {align: 'left' | 'justify'; blocks: ContentBlock[];translations?:{en?:LessonEnglish}};
 const emptyOverview: CourseOverview = {summary: '', objectives: '', audience: '', prerequisites: '', modality: ''};
 const string = (v: unknown) => typeof v === 'string' ? v : '';
 function payload(raw: string, prefix: string): any {
@@ -24,10 +26,16 @@ function payload(raw: string, prefix: string): any {
 export function courseOverview(raw: unknown): CourseOverview {
   const original = string(raw), data = payload(original, COURSE_FORMAT);
   if (!data || typeof data.summary !== 'string') return {...emptyOverview, summary: original};
-  return Object.fromEntries(Object.keys(emptyOverview).map(k => [k, string(data[k])])) as CourseOverview;
+  const result:CourseOverview={...emptyOverview,...Object.fromEntries(Object.keys(emptyOverview).map(k => [k, string(data[k])]))};
+  const en=cleanEnglishOverview(data.translations?.en);if(Object.keys(en).length)result.translations={en};
+  return result;
 }
+function cleanEnglishOverview(raw:any){const result:Record<string,string>={};for(const k of ['title','category','summary','objectives','audience','prerequisites'])if(typeof raw?.[k]==='string'&&raw[k].trim())result[k]=raw[k].trim();return result;}
+export function localisedOverview(raw:unknown,language:'pt'|'en'):CourseOverview{const base=courseOverview(raw);return language==='en'?{...base,...base.translations?.en}:base;}
+export function localisedCourse(course:any,language:'pt'|'en'){const en=courseOverview(course.summary).translations?.en;return language==='en'&&en?{...course,title:en.title||course.title,category:en.category||course.category}:course;}
 export function encodeOverview(input: CourseOverview): string {
-  const data = Object.fromEntries(Object.keys(emptyOverview).map(k => [k, string(input[k as keyof CourseOverview]).trim()])) as CourseOverview;
+  const data:CourseOverview = {...emptyOverview,...Object.fromEntries(Object.keys(emptyOverview).map(k => [k, string(input[k as keyof CourseOverview]).trim()]))};
+  const en=cleanEnglishOverview(input.translations?.en);if(Object.keys(en).length)data.translations={en};
   if (data.modality && !modalities.includes(data.modality)) throw Error('Seleccione uma modalidade válida.');
   const encoded = Object.entries(data).some(([key, value]) => key !== 'summary' && value) ? COURSE_FORMAT + JSON.stringify(data) : data.summary;
   if (encoded.length > 30000) throw Error('Reduza o texto da ficha: o conjunto dos campos deve caber em 30000 caracteres.');
@@ -41,11 +49,20 @@ export function lessonContent(raw: unknown): LessonContent {
   if (!data || !Array.isArray(data.blocks) || !data.blocks.every((b: any) => b && Object.hasOwn(blockLabels, b.type))) {
     return {align: 'justify', blocks: [{...newBlock('text', 'legacy-text'), text: original}]};
   }
-  return {align: data.align === 'justify' ? 'justify' : 'left', blocks: data.blocks.map((b: any, i: number) => ({
+  const result:LessonContent={align: data.align === 'justify' ? 'justify' : 'left', blocks: data.blocks.map((b: any, i: number) => ({
     id: string(b.id) || 'block-' + i, type: b.type,
     text: string(b.text), url: string(b.url), title: string(b.title), alt: string(b.alt), source: string(b.source),
   }))};
+  const en=cleanEnglishLesson(data.translations?.en,result.blocks);if(Object.keys(en).length)result.translations={en};return result;
 }
+function cleanEnglishLesson(raw:any,blocks:ContentBlock[]):LessonEnglish{
+ const en:LessonEnglish={};for(const k of ['title','module'] as const)if(typeof raw?.[k]==='string'&&raw[k].trim())en[k]=raw[k].trim();
+ const translated:NonNullable<LessonEnglish['blocks']>={};
+ for(const block of blocks){const fields:Partial<Pick<ContentBlock,'text'|'title'|'alt'>>={};for(const key of ['text','title','alt'] as const)if(typeof raw?.blocks?.[block.id]?.[key]==='string'&&raw.blocks[block.id][key].trim())fields[key]=raw.blocks[block.id][key].trim();if(Object.keys(fields).length)translated[block.id]=fields;}
+ if(Object.keys(translated).length)en.blocks=translated;return en;
+}
+export function localisedLesson(raw:unknown,language:'pt'|'en'):LessonContent{const base=lessonContent(raw),en=base.translations?.en;return language==='en'&&en?{...base,blocks:base.blocks.map(b=>({...b,...en.blocks?.[b.id]}))}:base;}
+export function localisedLessonRecord(lesson:any,language:'pt'|'en'){const en=lessonContent(lesson.body).translations?.en;return language==='en'&&en?{...lesson,title:en.title||lesson.title,module:en.module||lesson.module}:lesson;}
 export function safeResourceUrl(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw || /[\u0000-\u0020\u007f]/.test(raw)) return null;
   try {
@@ -87,12 +104,13 @@ export function encodeLesson(input: LessonContent): string {
     }
     return clean;
   });
-  const encoded = LESSON_FORMAT + JSON.stringify({align: input.align === 'justify' ? 'justify' : 'left', blocks});
+  const en=cleanEnglishLesson(input.translations?.en,blocks);
+  const encoded = LESSON_FORMAT + JSON.stringify({align: input.align === 'justify' ? 'justify' : 'left', blocks,...(Object.keys(en).length?{translations:{en}}:{})});
   if (encoded.length > 20000) throw Error('Reduza o conteúdo da aula para caber em 20000 caracteres.');
   return encoded;
 }
-export function lessonExcerpt(raw: unknown, limit = 160): string {
-  const text = lessonContent(raw).blocks.map(b => b.text || b.title || blockLabels[b.type]).join(' ').replace(/\s+/g, ' ').trim();
+export function lessonExcerpt(raw: unknown, limit = 160,language:'pt'|'en'='pt'): string {
+  const text = localisedLesson(raw,language).blocks.map(b => b.text || b.title || blockLabels[b.type]).join(' ').replace(/\s+/g, ' ').trim();
   return text.length > limit ? text.slice(0, limit) + '…' : text;
 }
 export function moveBlock(blocks: ContentBlock[], from: number, to: number): ContentBlock[] {

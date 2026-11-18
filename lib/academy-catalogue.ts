@@ -1,4 +1,5 @@
-import {courseOverview} from './academy-content';
+import {courseOverview,localisedCourse} from './academy-content';
+import {translate,type AcademyLanguage} from './academy-i18n';
 export type CatalogueFilters = {search: string; category: string; mode: string; order: string};
 export const defaultCatalogue: CatalogueFilters = {search: '', category: 'todas', mode: 'todos', order: 'recentes'};
 export const publicViews = ['perfil', 'inicio', 'catalogo', 'categorias', 'biblioteca', 'aprender', 'certificados', 'sobre', 'programas', 'formadores', 'noticias', 'eventos'];
@@ -13,19 +14,20 @@ export function courseCategories(courses: any[]) {
   return Array.from(categories, ([name, count]) => ({name, count})).sort((a, b) => a.name.localeCompare(b.name, 'pt'));
 }
 
-export function filterCatalogue(courses: any[], filters: CatalogueFilters, management = false, state = 'todos') {
+export function filterCatalogue(courses: any[], filters: CatalogueFilters, management = false, state = 'todos',language:AcademyLanguage='pt') {
   const query = normaliseSearch(filters.search);
   const result = courses.filter(c =>
     (management || c.status === 'publicado') &&
     (state === 'todos' || c.status === state) &&
     (filters.category === 'todas' || c.category === filters.category) &&
     (filters.mode === 'todos' || (filters.mode === 'academia' ? !c.external : !!c.external)) &&
-    normaliseSearch([c.title, c.category, ...Object.values(courseOverview(c.summary))].join(' ')).includes(query)
+    normaliseSearch([c.title, c.category, translate(c.title,'en'),translate(c.category,'en'), ...Object.values(courseOverview(c.summary)), ...Object.values(courseOverview(c.summary).translations?.en||{})].join(' ')).includes(query)
   );
   return result.sort((a, b) => {
-    if (filters.order === 'titulo') return a.title.localeCompare(b.title, 'pt');
-    if (filters.order === 'duracao') return (a.hours || Infinity) - (b.hours || Infinity) || a.title.localeCompare(b.title, 'pt');
-    return (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0) || a.title.localeCompare(b.title, 'pt');
+    const titleOrder=translate(localisedCourse(a,language).title,language).localeCompare(translate(localisedCourse(b,language).title,language),language);
+    if (filters.order === 'titulo') return titleOrder;
+    if (filters.order === 'duracao') return (a.hours || Infinity) - (b.hours || Infinity) || titleOrder;
+    return (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0) || titleOrder;
   });
 }
 
