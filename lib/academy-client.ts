@@ -98,7 +98,7 @@ export const academyPublicUrl = 'https://insmisau.github.io/academia-digital-ins
 
 // Keep the technical access in the same tab and origin as its private capability.
 export function academyAdministrationUrl(_isAdmin?: boolean) {
-  return academyManagement()?(academyValidation()?'?validacao=1&perfil=participante&gestao=1#gestao':'?gestao=1#gestao'):academyValidation()?'?validacao=1#painel':'?administracao=1#painel';
+  return academyManagement()?(academyValidation()?'?validacao=1&perfil=participante&gestao=1#gestao':'?gestao=1#gestao'):academyValidation()?'?validacao=1#painel':'?administracao=1#plataformas';
 }
 
 export function academyFetch(path: string, init: RequestInit = {}) {
@@ -166,3 +166,4 @@ export async function downloadMaterial(id:string,name:string){
  const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');
  link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
+

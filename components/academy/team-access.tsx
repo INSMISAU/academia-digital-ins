@@ -17,7 +17,7 @@ export function TeamGate({ children }: {
                     history.replaceState(null, '', location.pathname + location.search + '#painel');
                     setTeamAccess(key);
                     if (!academyAdministration() && !academyValidation()) {
-                        location.replace('?administracao=1#painel');
+                        location.replace('?administracao=1#plataformas');
                         return;
                     }
                 }
@@ -94,3 +94,4 @@ export function TeamBar() {
         return null;
     return <aside className="ins-team-bar" aria-label={tr("Navega\u00E7\u00E3o da administra\u00E7\u00E3o")}><strong>{tr(academyValidation() ? 'Validação' : 'Administração')}</strong><nav>{tr(academyValidation() && <><a href="?validacao=1#painel">{tr("Gest\u00E3o")}</a><a href="?validacao=1&perfil=participante#catalogo">{tr("\u00C1rea do participante")}</a></>)}<a href="?">{tr("Voltar \u00E0 Academia")}</a><button onClick={clearTeamAccess}>{tr("Sair")}</button></nav></aside>;
 }
+

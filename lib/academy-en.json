@@ -1287,5 +1287,21 @@
   "Página": "Page",
   "O PDF aceita até 2000 inscrições. Reduza a selecção.": "The PDF supports up to 2000 enrolments. Reduce the selection.",
   "A selecção mudou. Actualize os dados antes de exportar.": "The selection changed. Refresh the data before exporting.",
-  "O PDF não suporta alguns caracteres. Os dados originais não foram alterados.": "The PDF does not support some characters. The original data has not been changed."
+  "O PDF não suporta alguns caracteres. Os dados originais não foram alterados.": "The PDF does not support some characters. The original data has not been changed.",
+  "Seleccione a plataforma que pretende alterar.": "Select the platform you want to edit.",
+  "Seleccionar plataforma": "Select platform",
+  "Curso Básico": "Basic Course",
+  "Páginas, cursos da Academia, biblioteca, notícias e eventos.": "Pages, Academy courses, library, news and events.",
+  "Fichas de doenças, síndromes e secções do e-book.": "Disease profiles, syndromes and e-book sections.",
+  "Módulos, conteúdos das secções e questões de avaliação.": "Modules, section content and assessment questions.",
+  "Título do módulo": "Module title",
+  "Título da secção": "Section title",
+  "Conteúdo da secção": "Section content",
+  "Questões de avaliação": "Assessment questions",
+  "Alterações por guardar": "Unsaved changes",
+  "Descarregar versão aprovada": "Download approved version",
+  "Criar rascunho a partir desta versão": "Create a draft from this version",
+  "Carregue formacao-dados.js e sw.js na raiz do repositório demo-modulo-surtos para publicar esta versão.": "Upload formacao-dados.js and sw.js to the root of the demo-modulo-surtos repository to publish this version.",
+  "Versão aprovada descarregada.": "Approved version downloaded.",
+  "Explicação": "Explanation"
 }

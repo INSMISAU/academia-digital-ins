@@ -459,3 +459,5 @@ body{font-family:Arial,Helvetica,sans-serif;color:#19333f;font-size:16px;backgro
 @media print {
   .institutional-main :is(.academy-course-card, .panel, .metric, .academy-category-card, .academy-resume, .admin-shortcuts>button, .workspace-announcements>article, .assessment-choice, .assessment-history) {box-shadow: none;}
 }
+
+.platform-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.5rem}.platform-card{display:flex;flex-direction:column;gap:.8rem;text-align:left;color:inherit;text-decoration:none;cursor:pointer;font:inherit}.platform-card strong{font-size:1.2rem}.basic-editor .field{margin:1rem 0}.basic-editor fieldset{border:1px solid #d8e1e6;padding:1rem;margin:1rem 0;border-radius:.7rem}.basic-rich-text{border:1px solid #bacbd3;border-radius:.7rem;padding:1rem;min-height:12rem;max-height:40rem;overflow:auto}.basic-rich-text img{max-width:100%;height:auto}.basic-rich-text:focus{outline:3px solid #46788d}.basic-editor textarea{min-height:5rem}
