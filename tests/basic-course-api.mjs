@@ -5,6 +5,7 @@ const {outputFiles}=await build({stdin:{contents:`import {approved} from './lib/
 const mf=new Miniflare({modules:[{type:'ESModule',path:path.resolve('.sites-runtime/basic-course-worker.mjs'),contents:outputFiles[0].text}],compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],cf:false});let checks=0;
 async function call(data,status=200,auth=true){const r=await mf.dispatchFetch('https://unit.invalid/basic',{method:data?'POST':'GET',headers:{'Content-Type':'application/json',...(auth?{'X-Test-Management':'yes'}:{})},...(data?{body:JSON.stringify(data)}:{})});assert.equal(r.status,status,(await r.clone().text()).slice(0,250));checks++;return r;}
 try{
+ const initialDb=await mf.getD1Database('DB');for(const sql of (await fs.readFile('drizzle/0012_basic_course_isolation.sql','utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await initialDb.prepare(sql).run();
  await call(null,403,false);let current=await(await call()).json(),original=structuredClone(current.course);
  await call({action:'export',revision:0},409);
  current=await(await call({action:'save',revision:0,course:original})).json();assert.deepEqual(current.course,original);checks++;

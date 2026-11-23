@@ -9,10 +9,10 @@ const require=createRequire(import.meta.url),tmp=await fs.mkdtemp(path.join(os.t
 const {Miniflare}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
 const {build}=await import(require.resolve('esbuild',{paths:[require.resolve('wrangler')]}));
 const outfile=path.join(tmp,'worker.mjs');
-const modules={team:'team-access',admin:'administration/academy',val:'validation/academy',reg:'validation/registration',settings:'administration/registration/settings',privateSettings:'validation/registration/settings',publicReg:'registration',adminWork:'administration/workspace',validationWork:'validation/workspace',access:'administration/access',validationAccess:'validation/access'};
+const modules={basic:'validation/basic-course',team:'team-access',admin:'administration/academy',val:'validation/academy',reg:'validation/registration',settings:'administration/registration/settings',privateSettings:'validation/registration/settings',publicReg:'registration',adminWork:'administration/workspace',validationWork:'validation/workspace',access:'administration/access',validationAccess:'validation/access'};
 await build({stdin:{contents:Object.entries(modules).map(([name,url])=>`import * as ${name} from './app/api/${url}/route';`).join('\n')+`const paths={${Object.keys(modules).join(',')}};export default {fetch(r){const m=paths[new URL(r.url).pathname.slice(1)];return m[r.method](r);}}`,resolveDir:process.cwd(),loader:'ts'},outfile,bundle:true,format:'esm',platform:'neutral',mainFields:['module','main'],external:['cloudflare:workers','node:async_hooks','node:crypto'],tsconfig:'tsconfig.json'});
 const key='1'.repeat(64),expired='2'.repeat(64),hash=s=>createHash('sha256').update(s).digest('hex');
-const mf=new Miniflare({modules:true,script:await fs.readFile(outfile,'utf8'),compatibilityDate:'2026-05-01',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{INS_TEAM_ACCESS:JSON.stringify([{id:'local1',label:'Equipa local',hash:hash(key),expires:Date.now()+600000},{id:'expired',label:'Expirado',hash:hash(expired),expires:Date.now()-1}])}});
+const mf=new Miniflare({modules:true,script:await fs.readFile(outfile,'utf8'),compatibilityDate:'2026-05-01',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{INS_VALIDATION_ACCESS:JSON.stringify([{id:'validation',label:'Ensaio reservado',hash:hash('4'.repeat(64)),expires:Date.now()+600000}]),INS_TEAM_ACCESS:JSON.stringify([{id:'local1',label:'Equipa local',hash:hash(key),expires:Date.now()+600000},{id:'expired',label:'Expirado',hash:hash(expired),expires:Date.now()-1}])}});
 let checks=0;
 async function call(route,status,{method='GET',body,team=key,participant=false,origin='https://insmisau.github.io',bearer='a'.repeat(64)}={}){
  const headers={Origin:origin,Authorization:'Bearer '+bearer,'Content-Type':'application/json'};if(team)headers['X-Academy-Team']=team;if(participant)headers['X-Academy-Mode']='participant';
@@ -23,6 +23,15 @@ try{
  for(const f of (await fs.readdir('drizzle')).filter(n=>n.endsWith('.sql')).sort())for(const sql of (await fs.readFile('drizzle/'+f,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
  await db.prepare("INSERT INTO courses(id,title,summary,category,status,hours,pass,version,external,updated) VALUES('ficha-teste','Curso existente','','','publicado',1,80,1,NULL,'2026-11-16')").run();
  for(const route of ['team','admin','val','reg','privateSettings','adminWork','validationWork','access','validationAccess'])await call(route,401,{team:''});
+ await call('team',200,{team:'4'.repeat(64)});
+ for(const route of ['admin','adminWork','access'])await call(route,403,{team:'4'.repeat(64)});
+ await call('team',200,{team:'4'.repeat(64),method:'POST'});
+ await call('val',200,{team:'4'.repeat(64)});
+ let edition=await call('basic',200,{team:'4'.repeat(64)});const approved=JSON.stringify(edition.course);
+ for(const action of ['save','submit','return','submit','approve'])edition=await call('basic',200,{team:'4'.repeat(64),method:'POST',body:{action,revision:edition.revision,...(action==='save'?{course:edition.course}:{})}});
+ assert.equal(edition.state,'aprovado');assert.equal(JSON.stringify(edition.course),approved);
+ assert.equal((await db.prepare('SELECT count(*) n FROM basic_course_editions').first()).n,0);
+ assert.equal((await db.prepare('SELECT count(*) n FROM validation_basic_course_editions').first()).n,1);
  await call('team',401,{team:expired});await call('team',401,{team:'3'.repeat(64)});await call('team',403,{origin:'https://untrusted.invalid'});
  await call('team',200);await call('team',200,{method:'POST'});await call('team',200,{method:'POST'});
  assert.equal((await db.prepare('SELECT count(*) n FROM validation_courses WHERE id="ficha-teste"').first()).n,1);

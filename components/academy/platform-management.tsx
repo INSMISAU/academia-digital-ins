@@ -1,12 +1,12 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {academyFetch} from '@/lib/academy-client';
+import {academyFetch,academyValidation} from '@/lib/academy-client';
 import {tr} from './complete/language';
 import {BasicQuestionFields} from './basic-question-fields';
 export function PlatformManagement({navigate}:{navigate:(id:string)=>void}){
  return <section className="panel"><h1>{tr('Gestão de conteúdos')}</h1><p>{tr('Seleccione a plataforma que pretende alterar.')}</p><div className="platform-grid">
  <button className="panel platform-card" onClick={()=>navigate('painel')}><strong>{tr('Academia Digital')}</strong><span>{tr('Páginas, cursos da Academia, biblioteca, notícias e eventos.')}</span></button>
- <a className="panel platform-card" href="https://insmisau.github.io/manual-surtos/cms.html" target="_blank" rel="noopener noreferrer"><strong>{tr('Manual de Surtos')}</strong><span>{tr('Fichas de doenças, síndromes e secções do e-book.')}</span></a>
+ <a className="panel platform-card" href={academyValidation()?'https://insmisau.github.io/manual-surtos-teste/ensaio-editor/cms.html':'https://insmisau.github.io/manual-surtos/cms.html'} target="_blank" rel="noopener noreferrer"><strong>{tr('Manual de Surtos')}</strong><span>{tr('Fichas de doenças, síndromes e secções do e-book.')}</span></a>
  <button className="panel platform-card" onClick={()=>navigate('curso-basico-editor')}><strong>{tr('Curso Básico')}</strong><span>{tr('Módulos, conteúdos das secções e questões de avaliação.')}</span></button>
  </div></section>;
 }

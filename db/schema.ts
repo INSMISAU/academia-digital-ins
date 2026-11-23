@@ -145,3 +145,8 @@ export const validationAcademyCourseTrash=sqliteTable('validation_academy_course
 export const academyPackageLaunches=sqliteTable('academy_package_launches',{token:text().primaryKey(),packageId:text().notNull(),enrollmentId:text().notNull(),expires:integer().notNull(),created:text().notNull()});
 
 export const validationAcademyPackageLaunches=sqliteTable('validation_academy_package_launches',{token:text().primaryKey(),packageId:text().notNull(),enrollmentId:text().notNull(),expires:integer().notNull(),created:text().notNull()});
+
+export const basicCourseEditions=sqliteTable('basic_course_editions',{id:integer().primaryKey(),revision:integer().notNull(),state:text().notNull(),payload:text().notNull(),updated:text().notNull(),author:text().notNull()});
+export const basicCourseHistory=sqliteTable('basic_course_history',{id:integer().primaryKey({autoIncrement:true}),revision:integer().notNull(),state:text().notNull(),payload:text().notNull(),updated:text().notNull(),author:text().notNull()});
+export const validationBasicCourseEditions=sqliteTable('validation_basic_course_editions',{id:integer().primaryKey(),revision:integer().notNull(),state:text().notNull(),payload:text().notNull(),updated:text().notNull(),author:text().notNull()});
+export const validationBasicCourseHistory=sqliteTable('validation_basic_course_history',{id:integer().primaryKey({autoIncrement:true}),revision:integer().notNull(),state:text().notNull(),payload:text().notNull(),updated:text().notNull(),author:text().notNull()});

@@ -1,7 +1,5 @@
-import {env} from 'cloudflare:workers';
-
-// Explicit development setting, independent of the institutional role matrix.
-// Disabling it preserves accounts and removes their automatic administration.
+// Public account creation never grants administrative permissions, including
+// when a previous deployment still carries the retired development setting.
 export function openAdministrationRegistration(){
- return (env as unknown as Record<string,string>).INS_OPEN_ADMIN_REGISTRATION==='1';
+ return false;
 }

@@ -1,10 +1,9 @@
 import {admin,body,db,now,actor,fail,response,AcademyError} from '@/lib/academy/core';
 import {approved,validateCourse,nextState} from './model';
 import {coursePackage} from './package';
-async function prepare(){await db().prepare('CREATE TABLE IF NOT EXISTS basic_course_editions(id INTEGER PRIMARY KEY,revision INTEGER NOT NULL,state TEXT NOT NULL,payload TEXT NOT NULL,updated TEXT NOT NULL,author TEXT NOT NULL)').run();await db().prepare('CREATE TABLE IF NOT EXISTS basic_course_history(id INTEGER PRIMARY KEY AUTOINCREMENT,revision INTEGER NOT NULL,state TEXT NOT NULL,payload TEXT NOT NULL,updated TEXT NOT NULL,author TEXT NOT NULL)').run();}
 const initial=()=>({revision:0,state:'rascunho',course:approved,updated:'',author:''});
 export async function handleBasic(req:Request){try{
- admin(req);await prepare();const row=await db().prepare('SELECT * FROM basic_course_editions WHERE id=1').first<any>();
+ admin(req);const row=await db().prepare('SELECT * FROM basic_course_editions WHERE id=1').first<any>();
  const current=row?{...row,course:JSON.parse(row.payload)}:initial();delete current.payload;
  if(req.method==='GET')return response(current);
  const input=await body(req,600000);

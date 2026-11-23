@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {webcrypto as crypto} from 'node:crypto';
-const require=createRequire(import.meta.url), {build}=require('esbuild');
+const require=createRequire(import.meta.url), {build}=require(require.resolve('esbuild',{paths:[require.resolve('wrangler')]}));
 const {Miniflare,Response:MR}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
 const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'ins-oidc-'));
 const options={stdin:{contents:`import {env} from 'cloudflare:workers';import {POST as reg,GET as status} from './app/api/registration/route';import {POST as action} from './app/api/registration/identity/route';import {GET as begin} from './app/api/registration/identity/begin/route';import {GET as callback} from './app/api/registration/identity/callback/route';export default {async fetch(r){const p=new URL(r.url).pathname;return (p.endsWith('/begin')?begin:p.endsWith('/callback')?callback:p.endsWith('/identity')?action:r.method==='GET'?status:reg)(r)}}`,resolveDir:process.cwd(),loader:'ts'},write:false,bundle:true,format:'esm',platform:'neutral',mainFields:['module','main'],external:['cloudflare:workers','node:async_hooks'],tsconfig:'tsconfig.json'};

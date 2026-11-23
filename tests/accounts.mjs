@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-const require=createRequire(import.meta.url),{build}=require('esbuild');
+const require=createRequire(import.meta.url),{build}=require(require.resolve('esbuild',{paths:[require.resolve('wrangler')]}));
 const {Miniflare,Response:MR}=await import(require.resolve('miniflare',{paths:[require.resolve('wrangler')]}));
 const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'ins-accounts-'));
 const {outputFiles}=await build({stdin:{contents:`import {GET,POST} from './app/api/account/route';import {GET as academy,POST as write} from './app/api/academy/route';import {runValidation} from './db/validation';export default {fetch(r){const u=new URL(r.url),handle=()=>u.pathname.endsWith('/academy')?(r.method==='GET'?academy(r):write(r)):(r.method==='GET'?GET(r):POST(r));return u.pathname.startsWith('/validation/')?runValidation(handle,false):handle();}}`,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'neutral',mainFields:['module','main'],external:['cloudflare:workers','node:async_hooks','node:crypto'],tsconfig:'tsconfig.json'});

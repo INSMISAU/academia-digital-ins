@@ -85,6 +85,13 @@
       "when": 1794915253570,
       "tag": "0011_payment_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795437509474,
+      "tag": "0012_basic_course_isolation",
+      "breakpoints": true
     }
   ]
 }

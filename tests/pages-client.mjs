@@ -21,14 +21,14 @@ function client(origin, storage = localStorage, search = '') {
   return context.exports;
 }
 const origin = 'https://ins-academia-digital.perciliamuianga.chatgpt.site';
-assert.equal(client(origin).academyAdministrationUrl(false),'?administracao=1#painel');
-assert.equal(client('').academyAdministrationUrl(false),'?administracao=1#painel');
-assert.equal(client('').academyAdministrationUrl(true),'?administracao=1#painel');
+assert.equal(client(origin).academyAdministrationUrl(false),'?administracao=1#plataformas');
+assert.equal(client('').academyAdministrationUrl(false),'?administracao=1#plataformas');
+assert.equal(client('').academyAdministrationUrl(true),'?administracao=1#plataformas');
 // Keep the private capability on its original origin; no email collection or sign-in redirect.
 const hostedAdministration = new URL(client('').academyAdministrationUrl(false),origin);
 assert.equal(hostedAdministration.origin, origin);
 assert.equal(hostedAdministration.searchParams.get('administracao'), '1');
-assert.equal(hostedAdministration.hash, '#painel');
+assert.equal(hostedAdministration.hash, '#plataformas');
 assert(!/signin/.test(hostedAdministration.href));
 assert.equal(client(origin).academyPublicUrl,'https://insmisau.github.io/academia-digital-ins/');
 const ids=Array.from({length:100},()=>client('').academyRequestId());assert(ids.every(id=>/^[a-f0-9]{32}$/.test(id)));assert.equal(new Set(ids).size,100);
