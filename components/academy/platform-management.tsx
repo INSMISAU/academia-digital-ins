@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import {academyFetch} from '@/lib/academy-client';
 import {tr} from './complete/language';
+import {BasicQuestionFields} from './basic-question-fields';
 export function PlatformManagement({navigate}:{navigate:(id:string)=>void}){
  return <section className="panel"><h1>{tr('Gestão de conteúdos')}</h1><p>{tr('Seleccione a plataforma que pretende alterar.')}</p><div className="platform-grid">
  <button className="panel platform-card" onClick={()=>navigate('painel')}><strong>{tr('Academia Digital')}</strong><span>{tr('Páginas, cursos da Academia, biblioteca, notícias e eventos.')}</span></button>
@@ -27,7 +28,7 @@ export function BasicCourseEditor(){
  <label className="field">{tr('Secção')}<select value={sectionIndex} onChange={e=>setSectionIndex(Number(e.target.value))}>{m.sections.map((x:any,i:number)=><option key={x.id} value={i}>{x.title}</option>)}</select></label>
  <fieldset disabled={!editable}><label className="field">{tr('Título da secção')}<input value={s.title} onChange={e=>change(c=>{c.modules[moduleIndex].sections[sectionIndex].title=e.target.value;})}/></label><label className="field">{tr('Resumo')}<textarea rows={4} value={s.summary} onChange={e=>change(c=>{c.modules[moduleIndex].sections[sectionIndex].summary=e.target.value;})}/></label></fieldset>
  <h2>{tr('Conteúdo da secção')}</h2><div key={moduleIndex+'-'+sectionIndex+'-'+edition.revision} className="basic-rich-text" role="textbox" aria-label={tr('Conteúdo da secção')} aria-multiline="true" contentEditable={editable} suppressContentEditableWarning onClick={e=>{if((e.target as HTMLElement).closest('a'))e.preventDefault();}} onBlur={e=>{if(editable){const html=e.currentTarget.innerHTML.replaceAll('https://insmisau.github.io/demo-modulo-surtos/','');if(html!==s.html)change(c=>{c.modules[moduleIndex].sections[sectionIndex].html=html;});}}} dangerouslySetInnerHTML={{__html:s.html.replace(/(src|href)="(?!https?:|#|\/)([^"]+)"/g,'$1="https://insmisau.github.io/demo-modulo-surtos/$2"')}}/>
- <h2>{tr('Questões de avaliação')}</h2>{(m.questions||[]).map((q:any,i:number)=><fieldset key={q.id} disabled={!editable}><legend>{i+1}</legend><label className="field">{tr('Pergunta')}<textarea value={q.text} onChange={e=>change(c=>{c.modules[moduleIndex].questions[i].text=e.target.value;})}/></label>{(q.options||[]).map((o:any,j:number)=><label className="field" key={o.id}>{o.id}<input value={o.text} onChange={e=>change(c=>{c.modules[moduleIndex].questions[i].options[j].text=e.target.value;})}/></label>)}<label className="field">{tr('Explicação')}<textarea value={q.explanation} onChange={e=>change(c=>{c.modules[moduleIndex].questions[i].explanation=e.target.value;})}/></label></fieldset>)}
+ <h2>{tr('Questões de avaliação')}</h2>{(m.questions||[]).map((q:any,i:number)=><BasicQuestionFields key={q.id} question={q} number={i+1} disabled={!editable} onText={value=>change(c=>{c.modules[moduleIndex].questions[i].text=value;})} onOption={(j,value)=>change(c=>{c.modules[moduleIndex].questions[i].options[j].text=value;})} onExplanation={value=>change(c=>{c.modules[moduleIndex].questions[i].explanation=value;})}/>)}
  </section>;
 }
 

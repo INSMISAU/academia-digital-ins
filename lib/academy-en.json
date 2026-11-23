@@ -1303,5 +1303,7 @@
   "Criar rascunho a partir desta versão": "Create a draft from this version",
   "Carregue formacao-dados.js e sw.js na raiz do repositório demo-modulo-surtos para publicar esta versão.": "Upload formacao-dados.js and sw.js to the root of the demo-modulo-surtos repository to publish this version.",
   "Versão aprovada descarregada.": "Approved version downloaded.",
-  "Explicação": "Explanation"
+  "Explicação": "Explanation",
+  "Enunciado": "Question text",
+  "Resposta correcta aprovada": "Approved correct answer"
 }
