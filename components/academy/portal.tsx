@@ -89,7 +89,7 @@ export function EbookResource() {
       <div className="academy-course-type">{tr("eBook")}</div>
       <h3>{tr(academyEbook.title)}</h3>
       <p>{tr("Material de consulta")}</p>
-      <div className="academy-course-actions"><a className="button-link" href={academyEbook.url} target="_blank" rel="noopener noreferrer">{tr("Consultar eBook")}<ArrowRight size={15}/></a></div>
+      <div className="academy-course-actions"><a className="button-link" href={academyEbook.url} target="_self">{tr("Consultar eBook")}<ArrowRight size={15}/></a></div>
     </div>
   </article>;
 }
