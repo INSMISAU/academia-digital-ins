@@ -13,5 +13,5 @@
     <nav aria-label="Ajuda das plataformas" style="background:#e7f0f2;border-bottom:1px solid #c9dce0;padding:8px 20px;text-align:right;font:14px/1.5 Arial,sans-serif"><a href="./ajuda.html" style="color:#005d70;text-decoration:underline;text-underline-offset:3px">Ajuda e guias</a></nav>
     <div id="root"></div>
     <noscript>Active o JavaScript no navegador para abrir a Academia Digital do INS.</noscript>
-  </body>
+  <script>var guideQuery=new URLSearchParams(location.search);if(guideQuery.get('testadores')==='1'){var guideLink=document.querySelector('nav[aria-label="Ajuda das plataformas"] a');guideLink.href='./ajuda.html?testadores=1'+(guideQuery.get('administracao')==='1'?'&administracao=1':'');}</script></body>
 </html>
